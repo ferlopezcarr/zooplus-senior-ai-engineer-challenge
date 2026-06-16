@@ -1,0 +1,14 @@
+## AI ##
+.atl
+
+## Python ##
+
+.venv/
+__pycache__/
+.pytest_cache/
+
+## Environment ##
+*.env
+
+## Logs ##
+*.log
