@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zooplus-assistant-api"
+version = "0.1.0"
+description = "FastAPI PoC for product-grounded assistant"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+]
+
+[dependency-groups]
+test = [
+    # Starlette's TestClient in the current FastAPI lockset resolves to httpx2 first
+    # and falls back to deprecated httpx compatibility only when httpx2 is absent.
+    "httpx2>=2.4,<3",
+    "pytest>=8.4,<9",
+]
+
+[tool.hatch.build.targets.wheel]
+only-include = ["main.py", "src"]
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider"

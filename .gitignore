@@ -1,14 +1,36 @@
-## AI ##
+## AI
 .atl
 
-## Python ##
+## Python bytecode and caches
+*.py[cod]
+**/__pycache__/
 
-.venv/
-__pycache__/
+
+## Pytest and coverage
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 
-## Environment ##
+## Virtual environments
+.venv/
+venv/
+
+## Build and package outputs
+build/
+dist/
+*.egg-info/
+
+## OS and editor noise
+.DS_Store
+.idea/
+.vscode/
+
+## Local environment files
+.env
+.env.*
 *.env
+!*.env.example
 
-## Logs ##
+## Logs
 *.log
