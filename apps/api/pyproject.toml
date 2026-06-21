@@ -10,10 +10,15 @@ readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dependencies = [
     "fastapi>=0.115,<1",
+    "pydantic>=2.13,<3",
     "uvicorn>=0.30,<1",
 ]
 
 [dependency-groups]
+lint = [
+    "ruff>=0.12,<1",
+]
+
 test = [
     # Starlette's TestClient in the current FastAPI lockset resolves to httpx2 first
     # and falls back to deprecated httpx compatibility only when httpx2 is absent.

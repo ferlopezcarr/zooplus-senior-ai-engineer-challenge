@@ -1,1 +1,1 @@
-"""Output adapters (repositories and persistence interfaces)."""
+"""Output adapters (retrievers and persistence interfaces)."""

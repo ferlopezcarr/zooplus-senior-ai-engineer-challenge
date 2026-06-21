@@ -1,0 +1,363 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from main import app, build_app
+from src.infrastructure.input.http.chat.model import ChatResponse, ProductDTO
+
+
+def _write_dataset(tmp_path: Path, rows: list[dict[str, object]]) -> Path:
+    dataset_path = tmp_path / "catalog.json"
+    dataset_path.write_text(json.dumps(rows))
+    return dataset_path
+
+
+def test_chat_endpoint_uses_catalog_dataset_path_override(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "product_id": "env-only-product",
+                "product_name": "Env Only Ball",
+                "variant_name": "Dog Toy",
+                "summary": "ball for dog fetch",
+                "description": "small override dataset row",
+                "pet_type": "dog",
+                "brands": "Env Brand",
+                "site_id": 77,
+            }
+        ],
+    )
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert isinstance(body["answer"], str)
+    assert body["answer"]
+    assert body["retrieved_products"] == [
+        {
+            "product_id": "env-only-product",
+            "title": "Env Only Ball - Dog Toy",
+            "site_id": 77,
+            "category": "dog",
+            "score": 2.0,
+        }
+    ]
+
+
+def test_chat_endpoint_allows_brand_only_catalog_queries(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "product_id": "brand-only-product",
+                "product_name": "Sensitive Dry Food",
+                "variant_name": "12kg",
+                "summary": "complete nutrition",
+                "description": "adult dog food",
+                "pet_type": "dog",
+                "brands": "Eukanuba",
+                "site_id": 5,
+            }
+        ],
+    )
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 5, "query": "eukanuba"})
+
+    assert response.status_code == 200
+    assert response.json()["retrieved_products"] == [
+        {
+            "product_id": "brand-only-product",
+            "title": "Sensitive Dry Food - 12kg",
+            "site_id": 5,
+            "category": "dog",
+            "score": 1.0,
+        }
+    ]
+
+
+def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "product_id": "beta-ball",
+                "product_name": "Beta Ball",
+                "variant_name": "Dog Toy",
+                "summary": "ball for dog play",
+                "description": "durable dog toy",
+                "pet_type": "dog",
+                "brands": "Beta",
+                "site_id": 1,
+            },
+            {
+                "product_id": "alpha-ball",
+                "product_name": "Alpha Ball",
+                "variant_name": "Dog Toy",
+                "summary": "ball for dog play",
+                "description": "light dog toy",
+                "pet_type": "dog",
+                "brands": "Alpha",
+                "site_id": 1,
+            },
+            {
+                "product_id": "omega-ball",
+                "product_name": "Omega Ball",
+                "variant_name": "Dog Fetch",
+                "summary": "ball for dog fetch",
+                "description": "fetch toy",
+                "pet_type": "dog",
+                "brands": "Omega",
+                "site_id": 1,
+            },
+            {
+                "product_id": "offsite-ball",
+                "product_name": "Offsite Ball",
+                "variant_name": "Dog Fetch",
+                "summary": "ball for dog fetch",
+                "description": "wrong site row",
+                "pet_type": "dog",
+                "brands": "Elsewhere",
+                "site_id": 2,
+            },
+        ],
+    )
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "dog ball fetch"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    body = response.json()
+
+    assert isinstance(body["answer"], str)
+    assert body["answer"]
+    assert body["retrieved_products"] == [
+        {
+            "product_id": "omega-ball",
+            "title": "Omega Ball - Dog Fetch",
+            "site_id": 1,
+            "category": "dog",
+            "score": 3.0,
+        },
+        {
+            "product_id": "alpha-ball",
+            "title": "Alpha Ball - Dog Toy",
+            "site_id": 1,
+            "category": "dog",
+            "score": 2.0,
+        },
+        {
+            "product_id": "beta-ball",
+            "title": "Beta Ball - Dog Toy",
+            "site_id": 1,
+            "category": "dog",
+            "score": 2.0,
+        },
+    ]
+
+
+def test_chat_endpoint_ignores_dataset_rows_with_boolean_site_ids(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "product_id": "boolean-site-row",
+                "product_name": "Boolean Site Ball",
+                "variant_name": "Dog Fetch",
+                "summary": "dog ball fetch",
+                "description": "malformed site id row",
+                "pet_type": "dog",
+                "brands": "Broken",
+                "site_id": True,
+            },
+            {
+                "product_id": "valid-site-row",
+                "product_name": "Valid Site Ball",
+                "variant_name": "Dog Fetch",
+                "summary": "dog ball fetch",
+                "description": "valid site id row",
+                "pet_type": "dog",
+                "brands": "Valid",
+                "site_id": 1,
+            },
+        ],
+    )
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "dog ball fetch"})
+
+    assert response.status_code == 200
+    assert response.json()["retrieved_products"] == [
+        {
+            "product_id": "valid-site-row",
+            "title": "Valid Site Ball - Dog Fetch",
+            "site_id": 1,
+            "category": "dog",
+            "score": 3.0,
+        }
+    ]
+
+
+def test_chat_endpoint_rejects_invalid_requests() -> None:
+    client = TestClient(app)
+
+    missing_site_response = client.post("/chat", json={"query": "dog food"})
+    boolean_site_response = client.post(
+        "/chat", json={"site_id": True, "query": "dog food"}
+    )
+    float_site_response = client.post(
+        "/chat", json={"site_id": 1.0, "query": "dog food"}
+    )
+    string_site_response = client.post(
+        "/chat", json={"site_id": "1", "query": "dog food"}
+    )
+    zero_padded_string_site_response = client.post(
+        "/chat", json={"site_id": "01", "query": "dog food"}
+    )
+    zero_site_response = client.post("/chat", json={"site_id": 0, "query": "dog food"})
+    negative_site_response = client.post(
+        "/chat", json={"site_id": -1, "query": "dog food"}
+    )
+    empty_query_response = client.post("/chat", json={"site_id": 1, "query": "   "})
+    semantic_query_response = client.post(
+        "/chat", json={"site_id": 1, "query": "!!! &amp; ???"}
+    )
+
+    assert missing_site_response.status_code == 422
+    assert boolean_site_response.status_code == 422
+    assert float_site_response.status_code == 422
+    assert string_site_response.status_code == 422
+    assert zero_padded_string_site_response.status_code == 422
+    assert zero_site_response.status_code == 422
+    assert negative_site_response.status_code == 422
+    assert empty_query_response.status_code == 422
+    assert semantic_query_response.status_code == 422
+
+
+def test_chat_endpoint_rejects_malformed_json_requests() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/chat",
+        content='{"site_id": 1,',
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert response.headers["content-type"].startswith("application/json")
+    body = response.json()
+
+    assert isinstance(body.get("detail"), list)
+    assert body["detail"]
+    assert body["detail"][0]["loc"][0] == "body"
+    assert isinstance(body["detail"][0]["msg"], str)
+    assert body["detail"][0]["msg"]
+    assert isinstance(body["detail"][0]["type"], str)
+    assert body["detail"][0]["type"]
+
+
+def test_chat_endpoint_returns_503_when_dataset_file_is_missing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    missing_dataset_path = tmp_path / "missing.json"
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(missing_dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Catalog dataset is unavailable."}
+    assert str(missing_dataset_path) not in response.json()["detail"]
+
+
+def test_chat_endpoint_returns_503_when_dataset_json_is_invalid(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = tmp_path / "invalid.json"
+    dataset_path.write_text("{not-valid-json")
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Catalog dataset is unavailable."}
+    assert str(dataset_path) not in response.json()["detail"]
+
+
+def test_chat_endpoint_returns_503_when_dataset_rows_are_malformed(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "product_id": "broken-product",
+                "product_name": "Broken Food",
+                "summary": "dog food",
+                "description": "missing variant name",
+                "pet_type": "dog",
+                "brands": "Broken",
+                "site_id": 1,
+            }
+        ],
+    )
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Catalog dataset is unavailable."}
+
+
+def test_chat_endpoint_returns_503_when_dataset_root_json_is_not_an_array(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    dataset_path = tmp_path / "catalog.json"
+    dataset_path.write_text(json.dumps({"product_id": "not-an-array"}))
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Catalog dataset is unavailable."}
+
+
+def test_http_model_package_exports_product_dto() -> None:
+    response = ChatResponse(
+        answer="ok",
+        retrieved_products=[
+            ProductDTO(
+                product_id="sku-1",
+                title="Toy",
+                site_id=1,
+                category="dog",
+                score=1.0,
+            )
+        ],
+    )
+
+    assert isinstance(response.retrieved_products[0], ProductDTO)
