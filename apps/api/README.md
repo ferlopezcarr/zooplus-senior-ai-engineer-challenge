@@ -28,7 +28,7 @@ make run
 ## Manual LLM check
 
 1. Copy `apps/api/.env.example` to `apps/api/.env`.
-2. Uncomment `LLM_BASE_URL` in `apps/api/.env`, then set `LLM_API_KEY` to a real key instead of the example placeholder. Keep `LLM_MODEL` only if you want to override the default.
+2. Uncomment `LLM_BASE_URL` in `apps/api/.env`, then set `LLM_API_KEY` to a real key instead of the example placeholder. Keep `LLM_MODEL` only if you want to override the default. Set `LLM_TIMEOUT_SECONDS` only if 10 seconds is too low or too high for your provider.
 3. Run `make run` from `apps/api`.
 4. In another terminal, call:
 
@@ -59,7 +59,7 @@ make format
 
 - `CATALOG_DATASET_PATH` optionally overrides the dataset path; the default points to `data/product_catalog_dataset.json` in the repository root.
 - `.env` uses `python-dotenv`; `build_app()` loads `apps/api/.env` at startup with environment variables still taking precedence over file values.
-- Optional LLM answer generation is enabled only when both `LLM_BASE_URL` and `LLM_API_KEY` are non-blank after `.env` loading. If either one is missing, the app logs a one-time startup warning and uses `DeterministicAnswerGenerator`. If `LLM_BASE_URL` is present but invalid, startup fails fast. `LLM_MODEL` still defaults to `gpt-4o-mini`, and `LLM_API_KEY=replace-me` is treated like any other configured key value.
+- Optional LLM answer generation is enabled only when both `LLM_BASE_URL` and `LLM_API_KEY` are non-blank after `.env` loading. If either one is missing, the app logs a one-time startup warning and uses `DeterministicAnswerGenerator`. If `LLM_BASE_URL` is present but invalid, startup fails fast. `LLM_MODEL` still defaults to `gpt-4o-mini`. `LLM_TIMEOUT_SECONDS` defaults to `10` when missing or blank, and must parse as a positive integer or float when LLM mode is enabled. `LLM_API_KEY=replace-me` is treated like any other configured key value.
 - Dependency management uses `uv` through the local `apps/api/Makefile`.
 
 ## Layout

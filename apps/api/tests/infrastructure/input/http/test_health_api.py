@@ -12,6 +12,7 @@ def _clear_llm_env(monkeypatch) -> None:
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_TIMEOUT_SECONDS", raising=False)
     monkeypatch.setattr(main, "DOTENV_PATH", Path(".missing-test.env"))
     monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
 
@@ -140,6 +141,7 @@ def test_build_app_loads_llm_config_from_dotenv(tmp_path: Path, monkeypatch) -> 
         "LLM_API_KEY=secret\n"
         "LLM_MODEL=test-model\n"
         "LLM_BASE_URL=https://example.test/v1\n"
+        "LLM_TIMEOUT_SECONDS=2\n"
     )
 
     class StubAnswerClient:
@@ -188,6 +190,7 @@ def test_build_app_logs_when_llm_generator_is_enabled(monkeypatch, caplog) -> No
     monkeypatch.setenv("LLM_API_KEY", "secret")
     monkeypatch.setenv("LLM_MODEL", "test-model")
     monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "2")
     monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
     caplog.set_level(logging.INFO)
 
@@ -226,6 +229,7 @@ def test_build_app_treats_replace_me_key_as_configured_value(
 
     monkeypatch.setenv("LLM_API_KEY", "replace-me")
     monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "2")
     monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
 
     client = TestClient(main.build_app())
@@ -255,6 +259,7 @@ def test_build_app_logs_llm_base_url_without_userinfo(monkeypatch, caplog) -> No
     monkeypatch.setenv("LLM_API_KEY", "secret")
     monkeypatch.setenv("LLM_MODEL", "test-model")
     monkeypatch.setenv("LLM_BASE_URL", "https://user:pass@example.test/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "2")
     monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
     caplog.set_level(logging.INFO)
 
@@ -280,6 +285,7 @@ def test_build_app_prefers_os_env_over_dotenv_values(
         "LLM_API_KEY=dotenv-secret\n"
         "LLM_MODEL=dotenv-model\n"
         "LLM_BASE_URL=https://dotenv.example/v1\n"
+        "LLM_TIMEOUT_SECONDS=2\n"
     )
 
     class StubAnswerClient:
@@ -301,6 +307,7 @@ def test_build_app_prefers_os_env_over_dotenv_values(
     monkeypatch.setenv("LLM_API_KEY", "env-secret")
     monkeypatch.setenv("LLM_MODEL", "env-model")
     monkeypatch.setenv("LLM_BASE_URL", "https://env.example/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "2")
     monkeypatch.setattr(main, "DOTENV_PATH", dotenv_path)
     monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
 
@@ -352,3 +359,69 @@ def test_build_app_fails_fast_for_invalid_llm_base_url_from_dotenv(
 
     with pytest.raises(ValueError, match="LLM_BASE_URL"):
         main.build_app()
+
+
+def test_build_app_uses_default_llm_timeout_when_env_is_missing(monkeypatch) -> None:
+    class StubAnswerClient:
+        def __init__(self, **kwargs) -> None:
+            assert kwargs["timeout_seconds"] == 10.0
+
+        def from_catalog(self, site_id: int, context) -> str:
+            return "Grounded answer from LLM"
+
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
+
+    client = TestClient(main.build_app())
+
+    assert client.get("/health").status_code == 200
+
+
+def test_build_app_uses_overridden_llm_timeout(monkeypatch) -> None:
+    class StubAnswerClient:
+        def __init__(self, **kwargs) -> None:
+            assert kwargs["timeout_seconds"] == 12.5
+
+        def from_catalog(self, site_id: int, context) -> str:
+            return "Grounded answer from LLM"
+
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "12.5")
+    monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
+
+    client = TestClient(main.build_app())
+
+    assert client.get("/health").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "timeout_value", ["0", "-1", "nope", "   0.0   ", "nan", "inf", "1e309"]
+)
+def test_build_app_fails_fast_for_invalid_llm_timeout_when_llm_is_enabled(
+    timeout_value: str, monkeypatch
+) -> None:
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", timeout_value)
+
+    with pytest.raises(ValueError, match="LLM_TIMEOUT_SECONDS"):
+        main.build_app()
+
+
+@pytest.mark.parametrize(
+    "timeout_value", ["0", "-1", "nope", "   0.0   ", "nan", "inf", "1e309"]
+)
+def test_build_app_ignores_invalid_llm_timeout_when_llm_is_disabled(
+    timeout_value: str, monkeypatch, caplog
+) -> None:
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", timeout_value)
+    caplog.set_level(logging.WARNING)
+
+    client = TestClient(main.build_app())
+
+    assert client.get("/health").status_code == 200
+    assert [record.getMessage() for record in caplog.records] == [
+        f"LLM_BASE_URL is not set after loading {main.DOTENV_PATH}; using deterministic answer generation."
+    ]

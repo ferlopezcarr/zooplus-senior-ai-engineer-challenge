@@ -21,6 +21,7 @@ def _clear_llm_env(monkeypatch) -> None:
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_TIMEOUT_SECONDS", raising=False)
     monkeypatch.setattr(main, "DOTENV_PATH", Path(".missing-test.env"))
     monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
 
@@ -152,6 +153,7 @@ def test_chat_endpoint_uses_llm_answer_when_configured(
     monkeypatch.setenv("LLM_API_KEY", "secret")
     monkeypatch.setenv("LLM_MODEL", "test-model")
     monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "2")
     monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
 
     client = TestClient(main.build_app())

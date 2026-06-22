@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 from src.application.response_context import ResponseContext
 
 
-DEFAULT_LLM_TIMEOUT_SECONDS = 2.0
+DEFAULT_LLM_TIMEOUT_SECONDS = 10.0
 HTTP_ERROR_BODY_LIMIT = 400
 
 _REDACTED = "[REDACTED]"

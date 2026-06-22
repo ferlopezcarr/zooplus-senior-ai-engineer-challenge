@@ -1,5 +1,6 @@
 """FastAPI bootstrap for the assistant API."""
 
+import math
 import logging
 from collections.abc import Mapping
 from os import getenv
@@ -78,6 +79,7 @@ def _build_answer_generator() -> AnswerGenerator:
         _warn_missing_llm_config_once("LLM_API_KEY")
         return DeterministicAnswerGenerator()
 
+    timeout_seconds = _get_llm_timeout_seconds()
     model = getenv("LLM_MODEL", "gpt-4o-mini")
     LOGGER.info(
         "LLM answer generation enabled with model=%s base_url=%s.",
@@ -88,7 +90,7 @@ def _build_answer_generator() -> AnswerGenerator:
         api_key=api_key,
         model=model,
         base_url=base_url,
-        timeout_seconds=DEFAULT_LLM_TIMEOUT_SECONDS,
+        timeout_seconds=timeout_seconds,
     )
     return LlmAnswerGenerator(client)
 
@@ -115,6 +117,22 @@ def _warn_missing_llm_config_once(name: str) -> None:
         DOTENV_PATH,
     )
     _missing_llm_config_warnings_emitted.add(name)
+
+
+def _get_llm_timeout_seconds() -> float:
+    value = getenv("LLM_TIMEOUT_SECONDS")
+    if value is None or not value.strip():
+        return DEFAULT_LLM_TIMEOUT_SECONDS
+
+    try:
+        timeout_seconds = float(value)
+    except ValueError as exc:
+        raise ValueError("LLM_TIMEOUT_SECONDS must be a positive number") from exc
+
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise ValueError("LLM_TIMEOUT_SECONDS must be a positive number")
+
+    return timeout_seconds
 
 
 def _safe_log_url(url: str) -> str:
