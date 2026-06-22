@@ -73,3 +73,23 @@ def test_health_endpoint_stays_healthy_when_dataset_rows_are_malformed(
 
     assert response.status_code == 200
     assert response.json() == {"status": "healthy"}
+
+
+def test_build_app_ignores_invalid_llm_base_url_without_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_BASE_URL", "http://unsafe.test/v1")
+
+    client = TestClient(build_app())
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "healthy"}
+
+
+def test_build_app_fails_fast_for_invalid_llm_base_url_with_api_key(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_BASE_URL", "http://unsafe.test/v1")
+
+    with pytest.raises(ValueError, match="LLM_BASE_URL"):
+        build_app()

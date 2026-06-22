@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from src.application.response_context import ResponseContext
 from src.domain import Product
-from src.infrastructure.output.llm_answer_client import OpenAICompatibleAnswerClient
+from src.infrastructure.output.llm_answer_client import (
+    OpenAICompatibleAnswerClient,
+    build_llm_chat_completions_url,
+)
 
 
 class _StubHTTPResponse:
@@ -87,3 +92,53 @@ def test_openai_compatible_answer_client_posts_grounded_prompt(monkeypatch) -> N
             },
         ],
     }
+
+
+def test_build_llm_chat_completions_url_accepts_https_base_url() -> None:
+    assert (
+        build_llm_chat_completions_url("https://example.test/v1/")
+        == "https://example.test/v1/chat/completions"
+    )
+
+
+@pytest.mark.parametrize(
+    ("base_url", "message"),
+    [
+        (
+            "",
+            "LLM_BASE_URL must be a non-empty HTTPS base URL without params, query, or fragment",
+        ),
+        (
+            "   ",
+            "LLM_BASE_URL must be a non-empty HTTPS base URL without params, query, or fragment",
+        ),
+        ("example.test/v1", "LLM_BASE_URL must use HTTPS and include a host"),
+        ("http://example.test/v1", "LLM_BASE_URL must use HTTPS and include a host"),
+        (
+            "https://example.test/v1;params",
+            "LLM_BASE_URL must be an HTTPS base URL without params, query, or fragment",
+        ),
+        (
+            "https://example.test/v1?debug=true",
+            "LLM_BASE_URL must be an HTTPS base URL without params, query, or fragment",
+        ),
+        (
+            "https://example.test/v1#fragment",
+            "LLM_BASE_URL must be an HTTPS base URL without params, query, or fragment",
+        ),
+    ],
+)
+def test_build_llm_chat_completions_url_rejects_urls_outside_our_env_contract(
+    base_url: str, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        build_llm_chat_completions_url(base_url)
+
+
+def test_build_llm_chat_completions_url_preserves_intentionally_narrow_env_contract() -> (
+    None
+):
+    assert (
+        build_llm_chat_completions_url("https://user@example.test/v1")
+        == "https://user@example.test/v1/chat/completions"
+    )
