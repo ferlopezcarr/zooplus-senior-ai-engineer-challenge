@@ -5,9 +5,17 @@ from os import getenv
 from pathlib import Path
 
 from fastapi import FastAPI
-from src.application.answer_generator import AnswerGenerator
+from src.application.answer_generator import (
+    AnswerGenerator,
+    DeterministicAnswerGenerator,
+    LlmAnswerGenerator,
+)
 from src.application.chat_use_case import ChatUseCase
 from src.infrastructure.input.http.chat.chat_route import build_chat_router
+from src.infrastructure.output.llm_answer_client import (
+    DEFAULT_LLM_TIMEOUT_SECONDS,
+    OpenAICompatibleAnswerClient,
+)
 from src.infrastructure.output.product_retriever import ProductRetriever
 
 
@@ -40,10 +48,26 @@ def build_app() -> FastAPI:
 
         return {"status": "healthy"}
 
-    use_case = ChatUseCase(retriever, answer_generator=AnswerGenerator())
+    use_case = ChatUseCase(retriever, answer_generator=_build_answer_generator())
     app.include_router(build_chat_router(use_case))
 
     return app
+
+
+def _build_answer_generator() -> AnswerGenerator:
+    api_key = getenv("LLM_API_KEY")
+    if not api_key:
+        return DeterministicAnswerGenerator()
+
+    model = getenv("LLM_MODEL", "gpt-4o-mini")
+    base_url = getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+    client = OpenAICompatibleAnswerClient(
+        api_key=api_key,
+        model=model,
+        base_url=base_url,
+        timeout_seconds=DEFAULT_LLM_TIMEOUT_SECONDS,
+    )
+    return LlmAnswerGenerator(client)
 
 
 app = build_app()

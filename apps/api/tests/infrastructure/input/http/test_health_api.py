@@ -1,12 +1,20 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
-from main import app, build_app
+from main import build_app
+
+
+@pytest.fixture(autouse=True)
+def _clear_llm_env(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
 
 def test_root_endpoint_returns_service_status() -> None:
-    client = TestClient(app)
+    client = TestClient(build_app())
     response = client.get("/")
 
     assert response.status_code == 200
@@ -17,7 +25,7 @@ def test_root_endpoint_returns_service_status() -> None:
 
 
 def test_health_endpoint_returns_healthy_status() -> None:
-    client = TestClient(app)
+    client = TestClient(build_app())
     response = client.get("/health")
 
     assert response.status_code == 200

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from src.application.answer_generator import AnswerGenerator
+from src.application.answer_generator import (
+    AnswerGenerator,
+    DeterministicAnswerGenerator,
+)
 from src.application.response_context import ResponseContext
 from src.application.services.topic_service import is_off_topic
 from src.domain import Chat, ChatResult
@@ -14,7 +17,7 @@ class ChatUseCase:
         answer_generator: AnswerGenerator | None = None,
     ) -> None:
         self._retriever = retriever
-        self._answer_generator = answer_generator or AnswerGenerator()
+        self._answer_generator = answer_generator or DeterministicAnswerGenerator()
 
     def handle(self, chat: Chat) -> ChatResult:
         products = self._retriever.retrieve(chat)

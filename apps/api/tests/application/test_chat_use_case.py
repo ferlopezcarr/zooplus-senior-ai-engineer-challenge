@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from src.application.answer_generator import AnswerGenerator
+from src.application.answer_generator import (
+    DeterministicAnswerGenerator,
+    LlmAnswerGenerator,
+)
 from src.application.chat_use_case import ChatUseCase
 from src.application.response_context import ResponseContext
 from src.domain import Chat, Product, Query, SiteId
@@ -84,7 +87,7 @@ def test_chat_use_case_builds_answer_from_same_product_context_it_returns() -> N
 
 
 def test_answer_generator_builds_catalog_answer_from_response_context() -> None:
-    generator = AnswerGenerator()
+    generator = DeterministicAnswerGenerator()
     context = ResponseContext(
         products=[
             Product(
@@ -103,6 +106,59 @@ def test_answer_generator_builds_catalog_answer_from_response_context() -> None:
     answer = generator.from_catalog(site_id=77, context=context)
 
     assert answer == (
+        "For site 77, I found these catalog matches: "
+        "Env Only Ball - Dog Toy (dog): ball for dog fetch."
+    )
+
+
+def test_llm_answer_generator_uses_llm_response_when_available() -> None:
+    class StubLLMClient:
+        def from_catalog(self, site_id: int, context: ResponseContext) -> str:
+            assert site_id == 77
+            assert context.products[0].title == "Env Only Ball - Dog Toy"
+            return "Grounded LLM answer"
+
+    generator = LlmAnswerGenerator(StubLLMClient())
+    context = ResponseContext(
+        products=[
+            Product(
+                article_id=5511354,
+                product_id="dog-ball",
+                variant_id="759837.1",
+                title="Env Only Ball - Dog Toy",
+                summary="ball for dog fetch",
+                site_id=77,
+                category="dog",
+                score=2.0,
+            )
+        ]
+    )
+
+    assert generator.from_catalog(site_id=77, context=context) == "Grounded LLM answer"
+
+
+def test_llm_answer_generator_falls_back_to_deterministic_answer() -> None:
+    class FailingLLMClient:
+        def from_catalog(self, site_id: int, context: ResponseContext) -> str:
+            raise TimeoutError("boom")
+
+    generator = LlmAnswerGenerator(FailingLLMClient())
+    context = ResponseContext(
+        products=[
+            Product(
+                article_id=5511354,
+                product_id="dog-ball",
+                variant_id="759837.1",
+                title="Env Only Ball - Dog Toy",
+                summary="ball for dog fetch",
+                site_id=77,
+                category="dog",
+                score=2.0,
+            )
+        ]
+    )
+
+    assert generator.from_catalog(site_id=77, context=context) == (
         "For site 77, I found these catalog matches: "
         "Env Only Ball - Dog Toy (dog): ball for dog fetch."
     )

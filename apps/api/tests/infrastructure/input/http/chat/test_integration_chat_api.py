@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
-from main import app, build_app
+from main import build_app
 from src.infrastructure.input.http.chat.model import ChatResponse, ProductDTO
 
 
@@ -13,6 +14,13 @@ def _write_dataset(tmp_path: Path, rows: list[dict[str, object]]) -> Path:
     dataset_path = tmp_path / "catalog.json"
     dataset_path.write_text(json.dumps(rows))
     return dataset_path
+
+
+@pytest.fixture(autouse=True)
+def _clear_llm_env(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
 
 def test_chat_endpoint_uses_catalog_dataset_path_override(
@@ -97,6 +105,129 @@ def test_chat_endpoint_allows_brand_only_catalog_queries(
             "score": 1.0,
         }
     ]
+
+
+def test_chat_endpoint_uses_llm_answer_when_configured(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "article_id": 2001,
+                "product_id": "env-only-product",
+                "variant_id": "env-only-product-1",
+                "product_name": "Env Only Ball",
+                "variant_name": "Dog Toy",
+                "summary": "ball for dog fetch",
+                "description": "small override dataset row",
+                "pet_type": "dog",
+                "brands": "Env Brand",
+                "site_id": 77,
+            }
+        ],
+    )
+
+    class StubAnswerClient:
+        def __init__(
+            self,
+            api_key: str,
+            model: str,
+            base_url: str,
+            timeout_seconds: float,
+        ) -> None:
+            assert api_key == "secret"
+            assert model == "test-model"
+            assert base_url == "https://example.test/v1"
+            assert timeout_seconds == 2.0
+
+        def from_catalog(self, site_id: int, context) -> str:
+            assert site_id == 77
+            assert len(context.products) == 1
+            return "Grounded answer from LLM"
+
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_MODEL", "test-model")
+    monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setattr("main.OpenAICompatibleAnswerClient", StubAnswerClient)
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["answer"] == "Grounded answer from LLM"
+    assert body["retrieved_products"] == [
+        {
+            "article_id": 2001,
+            "product_id": "env-only-product",
+            "variant_id": "env-only-product-1",
+            "title": "Env Only Ball - Dog Toy",
+            "summary": "ball for dog fetch",
+            "site_id": 77,
+            "category": "dog",
+            "score": 2.0,
+        }
+    ]
+
+
+def test_chat_endpoint_falls_back_when_llm_call_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "article_id": 2001,
+                "product_id": "env-only-product",
+                "variant_id": "env-only-product-1",
+                "product_name": "Env Only Ball",
+                "variant_name": "Dog Toy",
+                "summary": "ball for dog fetch",
+                "description": "small override dataset row",
+                "pet_type": "dog",
+                "brands": "Env Brand",
+                "site_id": 77,
+            }
+        ],
+    )
+
+    class FailingAnswerClient:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        def from_catalog(self, site_id: int, context) -> str:
+            assert site_id == 77
+            assert len(context.products) == 1
+            raise TimeoutError("boom")
+
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setattr("main.OpenAICompatibleAnswerClient", FailingAnswerClient)
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": (
+            "For site 77, I found these catalog matches: "
+            "Env Only Ball - Dog Toy (dog): ball for dog fetch."
+        ),
+        "retrieved_products": [
+            {
+                "article_id": 2001,
+                "product_id": "env-only-product",
+                "variant_id": "env-only-product-1",
+                "title": "Env Only Ball - Dog Toy",
+                "summary": "ball for dog fetch",
+                "site_id": 77,
+                "category": "dog",
+                "score": 2.0,
+            }
+        ],
+    }
 
 
 def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
@@ -258,7 +389,7 @@ def test_chat_endpoint_ignores_dataset_rows_with_boolean_site_ids(
 
 
 def test_chat_endpoint_rejects_invalid_requests() -> None:
-    client = TestClient(app)
+    client = TestClient(build_app())
 
     missing_site_response = client.post("/chat", json={"query": "dog food"})
     boolean_site_response = client.post(
@@ -294,7 +425,7 @@ def test_chat_endpoint_rejects_invalid_requests() -> None:
 
 
 def test_chat_endpoint_rejects_malformed_json_requests() -> None:
-    client = TestClient(app)
+    client = TestClient(build_app())
 
     response = client.post(
         "/chat",
