@@ -7,13 +7,13 @@ from src.application.answer_generator import (
 from src.application.model.response_context import ResponseContext
 from src.application.services.topic_service import is_off_topic
 from src.domain.model import Chat, ChatResult
-from src.infrastructure.output.product_retriever import ProductRetriever
+from src.infrastructure.output.product_retrieval_port import ProductRetrievalPort
 
 
 class ChatUseCase:
     def __init__(
         self,
-        retriever: ProductRetriever,
+        retriever: ProductRetrievalPort,
         answer_generator: AnswerGenerator | None = None,
     ) -> None:
         self._retriever = retriever
