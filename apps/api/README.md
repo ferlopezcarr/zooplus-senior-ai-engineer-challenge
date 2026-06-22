@@ -42,6 +42,18 @@ curl -X POST http://127.0.0.1:8000/chat \
 - If `LLM_BASE_URL` is present but invalid, startup fails fast with a configuration error.
 - If both are present, the app keeps the current OpenAI-compatible LLM path.
 
+## Manual LLM e2e tests
+
+Run from `apps/api`:
+
+```bash
+make test-e2e
+```
+
+- The tests use `TestClient(build_app())`, so no external server is needed.
+- They load the same local `.env` path as the app runtime and skip cleanly when `LLM_BASE_URL` or `LLM_API_KEY` is missing or blank.
+- `make test`, CI, and the tracked pre-commit flow stay on the default suite because `e2e` tests are excluded there.
+
 ## Format
 
 ```bash

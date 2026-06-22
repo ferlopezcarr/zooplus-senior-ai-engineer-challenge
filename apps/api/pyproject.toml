@@ -32,3 +32,6 @@ only-include = ["main.py", "src"]
 
 [tool.pytest.ini_options]
 addopts = "-p no:cacheprovider"
+markers = [
+    "e2e: manual end-to-end tests excluded from the default suite",
+]
