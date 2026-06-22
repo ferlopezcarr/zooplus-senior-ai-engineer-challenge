@@ -15,7 +15,7 @@
 
 ## Runtime Shape
 
-- `main.py` builds the FastAPI application and exports `app`.
+- `main.py` exposes `build_app()` and the runtime starts through `uvicorn main:build_app --factory`.
 - The current route surface exposes service metadata, health, and grounded chat.
 - `src/` reserves hexagonal package boundaries for domain, application, and infrastructure code.
 
@@ -23,14 +23,15 @@
 
 | Path | Role |
 | --- | --- |
-| `main.py` | FastAPI bootstrap and route registration. |
+| `main.py` | FastAPI bootstrap, `.env` loading, configuration validation, and route registration. |
 | `src/domain` | Domain boundary for core business concepts and rules, with domain models, value objects, and shared normalization service split by concern. |
-| `src/application` | Application boundary for use-case orchestration. |
+| `src/application` | Application boundary for use-case orchestration, response context, and answer-generation strategies. |
 | `src/infrastructure` | Infrastructure boundary for adapters and framework-facing code. |
 | `src/infrastructure/input` | Input adapter boundary. |
 | `src/infrastructure/input/http/chat` | HTTP chat adapter boundary for route wiring and transport/domain mapping. |
 | `src/infrastructure/input/http/chat/model` | HTTP DTO boundary for request, response, and nested transport models. |
-| `src/infrastructure/output` | Output adapter boundary for dataset-backed retrieval. |
+| `src/infrastructure/output` | Output adapter boundary for dataset-backed retrieval and optional external answer generation. |
+| `src/infrastructure/output/llm_answer_client.py` | OpenAI-compatible HTTP client for optional answer synthesis from retrieved catalog context. |
 | `src/infrastructure/output/service` | Output-adapter helpers for row-to-domain mapping. |
 | `tests` | API-local regression coverage. |
 
@@ -51,11 +52,21 @@
 | --- | --- | --- |
 | `GET /` | Implemented | Returns service status metadata. |
 | `GET /health` | Implemented | Returns process/liveness status only. |
-| `POST /chat` | Implemented | Validates `site_id` and `query`, attempts retrieval first, and returns a grounded JSON response or dataset-readiness failure. |
+| `POST /chat` | Implemented | Validates `site_id` and `query`, retrieves grounded catalog evidence, and returns a grounded JSON response or dataset-readiness failure. |
 
 ## Request Flow
 
-`HTTP request -> FastAPI route -> chat mapper -> chat use case -> chat mapper -> JSON response`
+`HTTP request -> FastAPI route -> chat mapper -> chat use case -> dataset retrieval -> response context -> optional LLM or deterministic answer generation -> chat mapper -> HTTP JSON response`
+
+- `ChatUseCase` always retrieves catalog products first.
+- Retrieved products are packaged into `ResponseContext` before answer generation.
+- `LlmAnswerGenerator` is enabled only when `LLM_BASE_URL` and `LLM_API_KEY` are both non-blank after environment and `.env` loading.
+- `LLM_TIMEOUT_SECONDS` optionally overrides provider timeout; otherwise the runtime uses the built-in default.
+- If `LLM_BASE_URL` or `LLM_API_KEY` is missing or blank, the use case stays in deterministic catalog-grounded mode.
+- If `LLM_BASE_URL` is present but invalid, startup fails fast even when `LLM_API_KEY` is missing.
+- If the provider request fails, the use case returns the deterministic catalog-grounded answer instead.
+- Provider HTTP error diagnostics are sanitized before logging so secrets are not echoed back.
+- Manual local LLM e2e coverage exists via `make test-e2e`, but the default runtime and default test flow do not require LLM credentials.
 
 ## Deployable Boundary
 
@@ -68,3 +79,5 @@
 - Use `../../../../README.md` for repository-level orientation.
 - Use `../specs/assistant-api-runtime.md` for the current HTTP contract.
 - Use `../specs/dataset-grounded-retrieval.md` for the current retrieval boundary.
+- Use `./first-delivery.md` for the historical first milestone snapshot.
+- Use `./second-delivery.md` for the second delivery delta.
