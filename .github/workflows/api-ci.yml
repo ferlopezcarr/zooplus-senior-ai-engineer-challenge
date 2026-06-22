@@ -1,0 +1,39 @@
+name: API CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: apps/api/.python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Check formatting
+        run: uv run --group lint ruff format --check .
+
+      - name: Run linter
+        run: make lint
+
+      - name: Run tests
+        run: make test
