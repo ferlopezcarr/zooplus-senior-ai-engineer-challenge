@@ -7,6 +7,7 @@ Local execution guide for the current `apps/api` service.
 - `docs/architecture/overview.md` for API runtime structure.
 - `docs/specs/assistant-api-runtime.md` for the current HTTP contract.
 - `docs/specs/dataset-grounded-retrieval.md` for the current retrieval boundary.
+- `../../infrastructure/local/README.md` for optional local Docker/PostgreSQL usage.
 - `requests/*.http` for minimal local request examples.
 
 ## Local startup from zero

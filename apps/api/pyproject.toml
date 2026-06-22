@@ -9,9 +9,13 @@ description = "FastAPI PoC for product-grounded assistant"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dependencies = [
+    "alembic>=1.16,<2",
+    "asyncpg>=0.30,<1",
     "fastapi>=0.115,<1",
+    "pgvector>=0.4,<1",
     "pydantic>=2.13,<3",
     "python-dotenv>=1,<2",
+    "sqlalchemy>=2.0,<3",
     "uvicorn>=0.30,<1",
 ]
 
@@ -24,7 +28,7 @@ test = [
     # Starlette's TestClient in the current FastAPI lockset resolves to httpx2 first
     # and falls back to deprecated httpx compatibility only when httpx2 is absent.
     "httpx2>=2.4,<3",
-    "pytest>=8.4,<9",
+    "pytest>=9.0.3,<10",
 ]
 
 [tool.hatch.build.targets.wheel]
