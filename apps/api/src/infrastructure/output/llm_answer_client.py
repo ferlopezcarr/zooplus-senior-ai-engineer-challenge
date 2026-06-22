@@ -6,22 +6,13 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from src.application.response_context import ResponseContext
+from src.application.model.response_context import ResponseContext
 
 
 DEFAULT_LLM_TIMEOUT_SECONDS = 10.0
 HTTP_ERROR_BODY_LIMIT = 400
 
 _REDACTED = "[REDACTED]"
-_JSON_SECRET_KEY_PATTERN = re.compile(
-    r'(?i)(["\']?(?:api_key|apikey|access_token|token|authorization)["\']?\s*:\s*["\'])(.*?)(["\'])'
-)
-_JSON_SECRET_BARE_VALUE_PATTERN = re.compile(
-    r'(?i)(["\']?(?:api_key|apikey|access_token|token)["\']?\s*:\s*)(?!["\'])([^,}\]\s]+)'
-)
-_AUTHORIZATION_HEADER_PATTERN = re.compile(
-    r'(?i)(authorization\s*:\s*bearer\s+)([^\s,;"\']+)'
-)
 _BEARER_TOKEN_PATTERN = re.compile(r'(?i)\bbearer\s+([^\s,;"\']+)')
 
 
@@ -143,15 +134,6 @@ def _sanitize_http_error_body(body: str, api_key: str) -> str:
     if api_key:
         sanitized = sanitized.replace(api_key, _REDACTED)
 
-    sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(
-        lambda match: f"{match.group(1)}{_REDACTED}", sanitized
-    )
     sanitized = _BEARER_TOKEN_PATTERN.sub(f"Bearer {_REDACTED}", sanitized)
-    sanitized = _JSON_SECRET_KEY_PATTERN.sub(
-        lambda match: f"{match.group(1)}{_REDACTED}{match.group(3)}", sanitized
-    )
-    sanitized = _JSON_SECRET_BARE_VALUE_PATTERN.sub(
-        lambda match: f"{match.group(1)}{_REDACTED}", sanitized
-    )
 
     return sanitized
