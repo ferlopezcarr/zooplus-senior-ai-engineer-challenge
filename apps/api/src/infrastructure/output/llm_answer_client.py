@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -8,6 +10,23 @@ from src.application.response_context import ResponseContext
 
 
 DEFAULT_LLM_TIMEOUT_SECONDS = 2.0
+HTTP_ERROR_BODY_LIMIT = 400
+
+_REDACTED = "[REDACTED]"
+_JSON_SECRET_KEY_PATTERN = re.compile(
+    r'(?i)(["\']?(?:api_key|apikey|access_token|token|authorization)["\']?\s*:\s*["\'])(.*?)(["\'])'
+)
+_JSON_SECRET_BARE_VALUE_PATTERN = re.compile(
+    r'(?i)(["\']?(?:api_key|apikey|access_token|token)["\']?\s*:\s*)(?!["\'])([^,}\]\s]+)'
+)
+_AUTHORIZATION_HEADER_PATTERN = re.compile(
+    r'(?i)(authorization\s*:\s*bearer\s+)([^\s,;"\']+)'
+)
+_BEARER_TOKEN_PATTERN = re.compile(r'(?i)\bbearer\s+([^\s,;"\']+)')
+
+
+class LlmProviderHttpError(RuntimeError):
+    pass
 
 
 def build_llm_chat_completions_url(base_url: str) -> str:
@@ -72,8 +91,15 @@ class OpenAICompatibleAnswerClient:
             method="POST",
         )
 
-        with urlopen(request, timeout=self._timeout_seconds) as response:
-            body = json.loads(response.read().decode("utf-8"))
+        try:
+            with urlopen(request, timeout=self._timeout_seconds) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            message = f"LLM provider request failed with HTTP {exc.code}"
+            body_snippet = _read_http_error_body_snippet(exc, self._api_key)
+            if body_snippet:
+                message = f"{message}: {body_snippet}"
+            raise LlmProviderHttpError(message) from exc
 
         return str(body["choices"][0]["message"]["content"])
 
@@ -88,3 +114,44 @@ class OpenAICompatibleAnswerClient:
             f"{products}\n"
             "Answer the user with a concise grounded summary of the matches."
         )
+
+
+def _read_http_error_body_snippet(error: HTTPError, api_key: str) -> str:
+    if error.fp is None:
+        return ""
+
+    try:
+        body = error.read()
+    except Exception:
+        return ""
+
+    if not body:
+        return ""
+
+    snippet = _sanitize_http_error_body(
+        " ".join(body.decode("utf-8", errors="replace").split()),
+        api_key,
+    )
+    if len(snippet) <= HTTP_ERROR_BODY_LIMIT:
+        return snippet
+    return f"{snippet[:HTTP_ERROR_BODY_LIMIT].rstrip()}..."
+
+
+def _sanitize_http_error_body(body: str, api_key: str) -> str:
+    sanitized = body
+
+    if api_key:
+        sanitized = sanitized.replace(api_key, _REDACTED)
+
+    sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(
+        lambda match: f"{match.group(1)}{_REDACTED}", sanitized
+    )
+    sanitized = _BEARER_TOKEN_PATTERN.sub(f"Bearer {_REDACTED}", sanitized)
+    sanitized = _JSON_SECRET_KEY_PATTERN.sub(
+        lambda match: f"{match.group(1)}{_REDACTED}{match.group(3)}", sanitized
+    )
+    sanitized = _JSON_SECRET_BARE_VALUE_PATTERN.sub(
+        lambda match: f"{match.group(1)}{_REDACTED}", sanitized
+    )
+
+    return sanitized

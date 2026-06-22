@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Protocol
 
 from src.application.response_context import ResponseContext
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class AnswerGenerator(Protocol):
@@ -43,10 +47,17 @@ class LlmAnswerGenerator:
 
         try:
             answer = self._llm_client.from_catalog(site_id, context)
-        except Exception:
+        except Exception as exc:
+            LOGGER.warning(
+                "LLM answer generation failed; using deterministic fallback. error=%s",
+                exc,
+            )
             return fallback
 
         if not isinstance(answer, str) or not answer.strip():
+            LOGGER.warning(
+                "LLM returned an empty or non-string answer; using deterministic fallback."
+            )
             return fallback
 
         return answer.strip()

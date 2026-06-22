@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from main import build_app
+import main
 from src.infrastructure.input.http.chat.model import ChatResponse, ProductDTO
 
 
@@ -21,6 +21,8 @@ def _clear_llm_env(monkeypatch) -> None:
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.setattr(main, "DOTENV_PATH", Path(".missing-test.env"))
+    monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
 
 
 def test_chat_endpoint_uses_catalog_dataset_path_override(
@@ -45,7 +47,7 @@ def test_chat_endpoint_uses_catalog_dataset_path_override(
     )
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 200
@@ -89,7 +91,7 @@ def test_chat_endpoint_allows_brand_only_catalog_queries(
     )
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 5, "query": "eukanuba"})
 
     assert response.status_code == 200
@@ -150,9 +152,9 @@ def test_chat_endpoint_uses_llm_answer_when_configured(
     monkeypatch.setenv("LLM_API_KEY", "secret")
     monkeypatch.setenv("LLM_MODEL", "test-model")
     monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
-    monkeypatch.setattr("main.OpenAICompatibleAnswerClient", StubAnswerClient)
+    monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 200
@@ -204,9 +206,10 @@ def test_chat_endpoint_falls_back_when_llm_call_fails(
 
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
     monkeypatch.setenv("LLM_API_KEY", "secret")
-    monkeypatch.setattr("main.OpenAICompatibleAnswerClient", FailingAnswerClient)
+    monkeypatch.setenv("LLM_BASE_URL", "https://example.test/v1")
+    monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", FailingAnswerClient)
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 200
@@ -288,7 +291,7 @@ def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
     )
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "dog ball fetch"})
 
     assert response.status_code == 200
@@ -370,7 +373,7 @@ def test_chat_endpoint_ignores_dataset_rows_with_boolean_site_ids(
     )
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "dog ball fetch"})
 
     assert response.status_code == 200
@@ -389,7 +392,7 @@ def test_chat_endpoint_ignores_dataset_rows_with_boolean_site_ids(
 
 
 def test_chat_endpoint_rejects_invalid_requests() -> None:
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
 
     missing_site_response = client.post("/chat", json={"query": "dog food"})
     boolean_site_response = client.post(
@@ -425,7 +428,7 @@ def test_chat_endpoint_rejects_invalid_requests() -> None:
 
 
 def test_chat_endpoint_rejects_malformed_json_requests() -> None:
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
 
     response = client.post(
         "/chat",
@@ -452,7 +455,7 @@ def test_chat_endpoint_returns_503_when_dataset_file_is_missing(
     missing_dataset_path = tmp_path / "missing.json"
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(missing_dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
 
     assert response.status_code == 503
@@ -467,7 +470,7 @@ def test_chat_endpoint_returns_503_when_dataset_json_is_invalid(
     dataset_path.write_text("{not-valid-json")
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
 
     assert response.status_code == 503
@@ -494,7 +497,7 @@ def test_chat_endpoint_returns_503_when_dataset_rows_are_malformed(
     )
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
 
     assert response.status_code == 503
@@ -523,7 +526,7 @@ def test_chat_endpoint_returns_503_when_article_id_is_not_an_integer(
     )
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
 
     assert response.status_code == 503
@@ -552,7 +555,7 @@ def test_chat_endpoint_normalizes_html_summary_in_answer_and_retrieved_products(
     )
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "omega dogs"})
 
     assert response.status_code == 200
@@ -584,7 +587,7 @@ def test_chat_endpoint_returns_503_when_dataset_root_json_is_not_an_array(
     dataset_path.write_text(json.dumps({"product_id": "not-an-array"}))
     monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
 
-    client = TestClient(build_app())
+    client = TestClient(main.build_app())
     response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
 
     assert response.status_code == 503

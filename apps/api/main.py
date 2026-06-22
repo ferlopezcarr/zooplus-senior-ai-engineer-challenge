@@ -1,9 +1,12 @@
 """FastAPI bootstrap for the assistant API."""
 
+import logging
 from collections.abc import Mapping
 from os import getenv
 from pathlib import Path
+from urllib.parse import urlparse
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from src.application.answer_generator import (
     AnswerGenerator,
@@ -15,6 +18,7 @@ from src.infrastructure.input.http.chat.chat_route import build_chat_router
 from src.infrastructure.output.llm_answer_client import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     OpenAICompatibleAnswerClient,
+    build_llm_chat_completions_url,
 )
 from src.infrastructure.output.product_retriever import ProductRetriever
 
@@ -22,10 +26,17 @@ from src.infrastructure.output.product_retriever import ProductRetriever
 DEFAULT_DATASET_PATH = (
     Path(__file__).resolve().parents[2] / "data/product_catalog_dataset.json"
 )
+DOTENV_PATH = Path(__file__).resolve().parent / ".env"
+
+LOGGER = logging.getLogger(__name__)
+
+_missing_llm_config_warnings_emitted: set[str] = set()
 
 
 def build_app() -> FastAPI:
     """Build the FastAPI app for the current repository runtime."""
+
+    load_dotenv(DOTENV_PATH)
 
     app = FastAPI(
         title="Zooplus Assistant API",
@@ -55,12 +66,24 @@ def build_app() -> FastAPI:
 
 
 def _build_answer_generator() -> AnswerGenerator:
-    api_key = getenv("LLM_API_KEY")
+    base_url = _get_non_blank_env("LLM_BASE_URL")
+    if not base_url:
+        _warn_missing_llm_config_once("LLM_BASE_URL")
+        return DeterministicAnswerGenerator()
+
+    build_llm_chat_completions_url(base_url)
+
+    api_key = _get_non_blank_env("LLM_API_KEY")
     if not api_key:
+        _warn_missing_llm_config_once("LLM_API_KEY")
         return DeterministicAnswerGenerator()
 
     model = getenv("LLM_MODEL", "gpt-4o-mini")
-    base_url = getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+    LOGGER.info(
+        "LLM answer generation enabled with model=%s base_url=%s.",
+        model,
+        _safe_log_url(base_url),
+    )
     client = OpenAICompatibleAnswerClient(
         api_key=api_key,
         model=model,
@@ -70,4 +93,30 @@ def _build_answer_generator() -> AnswerGenerator:
     return LlmAnswerGenerator(client)
 
 
-app = build_app()
+def _get_non_blank_env(name: str) -> str | None:
+    value = getenv(name)
+    if value is None:
+        return None
+
+    normalized_value = value.strip()
+    if not normalized_value:
+        return None
+
+    return normalized_value
+
+
+def _warn_missing_llm_config_once(name: str) -> None:
+    if name in _missing_llm_config_warnings_emitted:
+        return
+
+    LOGGER.warning(
+        "%s is not set after loading %s; using deterministic answer generation.",
+        name,
+        DOTENV_PATH,
+    )
+    _missing_llm_config_warnings_emitted.add(name)
+
+
+def _safe_log_url(url: str) -> str:
+    parsed = urlparse(url.strip())
+    return parsed._replace(netloc=parsed.netloc.rsplit("@", 1)[-1]).geturl()

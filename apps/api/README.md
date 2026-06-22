@@ -25,6 +25,23 @@ make run
 - `make install` syncs runtime, test, and lint dependencies into the local uv-managed virtualenv.
 - `make run` starts the API on `http://127.0.0.1:8000`.
 
+## Manual LLM check
+
+1. Copy `apps/api/.env.example` to `apps/api/.env`.
+2. Uncomment `LLM_BASE_URL` in `apps/api/.env`, then set `LLM_API_KEY` to a real key instead of the example placeholder. Keep `LLM_MODEL` only if you want to override the default.
+3. Run `make run` from `apps/api`.
+4. In another terminal, call:
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"site_id": 1, "query": "dog food"}'
+```
+
+- If `LLM_BASE_URL` or `LLM_API_KEY` is missing, startup logs one warning and the API stays on deterministic catalog answers.
+- If `LLM_BASE_URL` is present but invalid, startup fails fast with a configuration error.
+- If both are present, the app keeps the current OpenAI-compatible LLM path.
+
 ## Format
 
 ```bash
@@ -41,7 +58,8 @@ make format
 ## Configuration
 
 - `CATALOG_DATASET_PATH` optionally overrides the dataset path; the default points to `data/product_catalog_dataset.json` in the repository root.
-- Optional LLM answer generation is enabled only when `LLM_API_KEY` is set. The app uses `DeterministicAnswerGenerator` by default and `LlmAnswerGenerator` when configured; `LLM_MODEL` defaults to `gpt-4o-mini`, `LLM_BASE_URL` defaults to `https://api.openai.com/v1`, and deterministic catalog answers remain the fallback on missing config or LLM call failure.
+- `.env` uses `python-dotenv`; `build_app()` loads `apps/api/.env` at startup with environment variables still taking precedence over file values.
+- Optional LLM answer generation is enabled only when both `LLM_BASE_URL` and `LLM_API_KEY` are non-blank after `.env` loading. If either one is missing, the app logs a one-time startup warning and uses `DeterministicAnswerGenerator`. If `LLM_BASE_URL` is present but invalid, startup fails fast. `LLM_MODEL` still defaults to `gpt-4o-mini`, and `LLM_API_KEY=replace-me` is treated like any other configured key value.
 - Dependency management uses `uv` through the local `apps/api/Makefile`.
 
 ## Layout

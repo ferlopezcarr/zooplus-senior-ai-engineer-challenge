@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib
+import sys
+
 from src.domain import Product
 from src.infrastructure.input.http.chat.model import (
     ChatRequest,
@@ -62,3 +65,14 @@ def test_output_product_mapper_keeps_runtime_product_shape() -> None:
         category="dog",
         score=2.0,
     )
+
+
+def test_main_module_import_does_not_build_app(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_BASE_URL", "http://unsafe.test/v1")
+    sys.modules.pop("main", None)
+
+    module = importlib.import_module("main")
+
+    assert not hasattr(module, "app")
+    assert callable(module.build_app)

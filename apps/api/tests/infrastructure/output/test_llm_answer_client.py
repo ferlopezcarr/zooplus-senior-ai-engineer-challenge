@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+from io import BytesIO
+from urllib.error import HTTPError
 
 import pytest
 
 from src.application.response_context import ResponseContext
 from src.domain import Product
 from src.infrastructure.output.llm_answer_client import (
+    HTTP_ERROR_BODY_LIMIT,
+    LlmProviderHttpError,
     OpenAICompatibleAnswerClient,
     build_llm_chat_completions_url,
 )
@@ -142,3 +146,89 @@ def test_build_llm_chat_completions_url_preserves_intentionally_narrow_env_contr
         build_llm_chat_completions_url("https://user@example.test/v1")
         == "https://user@example.test/v1/chat/completions"
     )
+
+
+def test_openai_compatible_answer_client_summarizes_http_errors(monkeypatch) -> None:
+    response_body = (
+        '{"error":{"message":"bad request",'
+        '"authorization":"Bearer provider-secret-token",'
+        '"api_key":"provider-api-key",'
+        '"access_token":"access-secret-token",'
+        '"token":"token-secret",'
+        '"details":"Authorization: Bearer header-secret provider echoed client-secret-key"}}'
+    ).encode("utf-8")
+
+    def stub_urlopen(request, timeout: float):
+        raise HTTPError(
+            url=request.full_url,
+            code=400,
+            msg="Bad Request",
+            hdrs=None,
+            fp=BytesIO(response_body),
+        )
+
+    monkeypatch.setattr(
+        "src.infrastructure.output.llm_answer_client.urlopen", stub_urlopen
+    )
+
+    client = OpenAICompatibleAnswerClient(
+        api_key="client-secret-key",
+        model="test-model",
+        base_url="https://example.test/v1/",
+    )
+
+    with pytest.raises(LlmProviderHttpError) as excinfo:
+        client.from_catalog(site_id=77, context=ResponseContext(products=[]))
+
+    message = str(excinfo.value)
+    assert message.startswith("LLM provider request failed with HTTP 400: ")
+    assert "provider-secret-token" not in message
+    assert "provider-api-key" not in message
+    assert "access-secret-token" not in message
+    assert "token-secret" not in message
+    assert "header-secret" not in message
+    assert "client-secret-key" not in message
+    assert '"authorization":"[REDACTED]"' in message
+    assert '"api_key":"[REDACTED]"' in message
+    assert '"access_token":"[REDACTED]"' in message
+    assert '"token":"[REDACTED]"' in message
+    assert "Authorization: Bearer [REDACTED]" in message
+
+
+def test_openai_compatible_answer_client_truncates_sanitized_http_error_body(
+    monkeypatch,
+) -> None:
+    response_body = (
+        '{"error":{"message":"bad request",'
+        '"details":"Authorization: Bearer header-secret '
+        + ("x" * (HTTP_ERROR_BODY_LIMIT + 50))
+        + '"}}'
+    ).encode("utf-8")
+
+    def stub_urlopen(request, timeout: float):
+        raise HTTPError(
+            url=request.full_url,
+            code=400,
+            msg="Bad Request",
+            hdrs=None,
+            fp=BytesIO(response_body),
+        )
+
+    monkeypatch.setattr(
+        "src.infrastructure.output.llm_answer_client.urlopen", stub_urlopen
+    )
+
+    client = OpenAICompatibleAnswerClient(
+        api_key="client-secret-key",
+        model="test-model",
+        base_url="https://example.test/v1/",
+    )
+
+    with pytest.raises(LlmProviderHttpError) as excinfo:
+        client.from_catalog(site_id=77, context=ResponseContext(products=[]))
+
+    message = str(excinfo.value)
+    assert "header-secret" not in message
+    assert "Authorization: Bearer [REDACTED]" in message
+    assert len(message) < 500
+    assert message.endswith("...")
