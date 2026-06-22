@@ -33,6 +33,14 @@ def test_query_value_object_normalizes_html_and_punctuation() -> None:
     assert Query("Cats &amp; Dogs!!").value == "cats dogs"
 
 
+def test_query_value_object_normalizes_once_for_retrieval_and_answer_generation() -> (
+    None
+):
+    query = Query("¿Qué pelota para perro recomendás?  ")
+
+    assert query.value == "qu pelota para perro recomend s"
+
+
 def test_text_normalizer_service_normalizes_html_text_for_user_readable_output() -> (
     None
 ):
@@ -104,7 +112,7 @@ def test_answer_generator_builds_catalog_answer_from_response_context() -> None:
         ]
     )
 
-    answer = generator.from_catalog(site_id=77, context=context)
+    answer = generator.from_catalog(site_id=77, query="ignored", context=context)
 
     assert answer == (
         "For site 77, I found these catalog matches: "
@@ -114,8 +122,11 @@ def test_answer_generator_builds_catalog_answer_from_response_context() -> None:
 
 def test_llm_answer_generator_uses_llm_response_when_available() -> None:
     class StubLLMClient:
-        def from_catalog(self, site_id: int, context: ResponseContext) -> str:
+        def from_catalog(
+            self, site_id: int, query: str, context: ResponseContext
+        ) -> str:
             assert site_id == 77
+            assert query == "qu pelota para perro recomend s"
             assert context.products[0].title == "Env Only Ball - Dog Toy"
             return "Grounded LLM answer"
 
@@ -135,12 +146,21 @@ def test_llm_answer_generator_uses_llm_response_when_available() -> None:
         ]
     )
 
-    assert generator.from_catalog(site_id=77, context=context) == "Grounded LLM answer"
+    assert (
+        generator.from_catalog(
+            site_id=77,
+            query="qu pelota para perro recomend s",
+            context=context,
+        )
+        == "Grounded LLM answer"
+    )
 
 
 def test_llm_answer_generator_falls_back_to_deterministic_answer(caplog) -> None:
     class FailingLLMClient:
-        def from_catalog(self, site_id: int, context: ResponseContext) -> str:
+        def from_catalog(
+            self, site_id: int, query: str, context: ResponseContext
+        ) -> str:
             raise TimeoutError("boom")
 
     generator = LlmAnswerGenerator(FailingLLMClient())
@@ -160,7 +180,7 @@ def test_llm_answer_generator_falls_back_to_deterministic_answer(caplog) -> None
         ]
     )
 
-    assert generator.from_catalog(site_id=77, context=context) == (
+    assert generator.from_catalog(site_id=77, query="env ball", context=context) == (
         "For site 77, I found these catalog matches: "
         "Env Only Ball - Dog Toy (dog): ball for dog fetch."
     )
@@ -172,7 +192,9 @@ def test_llm_answer_generator_falls_back_to_deterministic_answer(caplog) -> None
 
 def test_llm_answer_generator_logs_sanitized_provider_error(caplog) -> None:
     class FailingLLMClient:
-        def from_catalog(self, site_id: int, context: ResponseContext) -> str:
+        def from_catalog(
+            self, site_id: int, query: str, context: ResponseContext
+        ) -> str:
             raise RuntimeError(
                 "LLM provider request failed with HTTP 400: "
                 '{"error":{"message":"bad request","api_key":"[REDACTED]"}}'
@@ -195,7 +217,7 @@ def test_llm_answer_generator_logs_sanitized_provider_error(caplog) -> None:
         ]
     )
 
-    assert generator.from_catalog(site_id=77, context=context) == (
+    assert generator.from_catalog(site_id=77, query="env ball", context=context) == (
         "For site 77, I found these catalog matches: "
         "Env Only Ball - Dog Toy (dog): ball for dog fetch."
     )
@@ -210,7 +232,7 @@ def test_llm_answer_generator_logs_when_empty_or_non_string_answer_falls_back(
     answer, caplog
 ) -> None:
     class StubLLMClient:
-        def from_catalog(self, site_id: int, context: ResponseContext):
+        def from_catalog(self, site_id: int, query: str, context: ResponseContext):
             return answer
 
     generator = LlmAnswerGenerator(StubLLMClient())
@@ -230,13 +252,54 @@ def test_llm_answer_generator_logs_when_empty_or_non_string_answer_falls_back(
         ]
     )
 
-    assert generator.from_catalog(site_id=77, context=context) == (
+    assert generator.from_catalog(site_id=77, query="env ball", context=context) == (
         "For site 77, I found these catalog matches: "
         "Env Only Ball - Dog Toy (dog): ball for dog fetch."
     )
     assert [record.getMessage() for record in caplog.records] == [
         "LLM returned an empty or non-string answer; using deterministic fallback."
     ]
+
+
+def test_chat_use_case_passes_raw_query_into_answer_generation() -> None:
+    product = Product(
+        article_id=5511354,
+        product_id="dog-ball",
+        variant_id="759837.1",
+        title="Env Only Ball - Dog Toy",
+        summary="ball for dog fetch",
+        site_id=77,
+        category="dog",
+        score=2.0,
+    )
+
+    class StubRetriever:
+        def retrieve(self, chat: Chat) -> list[Product]:
+            return [product]
+
+    class StubAnswerGenerator:
+        def from_catalog(
+            self, site_id: int, query: str, context: ResponseContext
+        ) -> str:
+            assert site_id == 77
+            assert query == "qu pelota para perro recomend s"
+            assert context.products == [product]
+            return "Grounded answer"
+
+        def off_topic(self) -> str:
+            return "off-topic"
+
+        def no_results(self, site_id: int) -> str:
+            return "no-results"
+
+    use_case = ChatUseCase(StubRetriever(), answer_generator=StubAnswerGenerator())
+
+    result = use_case.handle(
+        Chat(site_id=SiteId(77), query=Query("¿Qué pelota para perro recomendás?"))
+    )
+
+    assert result.answer == "Grounded answer"
+    assert result.retrieved_products == [product]
 
 
 def test_product_retriever_keeps_results_isolated_by_site() -> None:

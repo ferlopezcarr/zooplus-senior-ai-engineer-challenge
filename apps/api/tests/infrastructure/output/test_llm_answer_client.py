@@ -67,7 +67,11 @@ def test_openai_compatible_answer_client_posts_grounded_prompt(monkeypatch) -> N
         ]
     )
 
-    answer = client.from_catalog(site_id=77, context=context)
+    answer = client.from_catalog(
+        site_id=77,
+        query="¿Qué pelota para perro recomendás?",
+        context=context,
+    )
 
     assert answer == "Grounded answer from LLM"
     assert captured["url"] == "https://example.test/v1/chat/completions"
@@ -80,8 +84,9 @@ def test_openai_compatible_answer_client_posts_grounded_prompt(monkeypatch) -> N
             {
                 "role": "system",
                 "content": (
-                    "Answer only from the provided catalog context. "
-                    "Do not mention products that are not in the context. "
+                    "Answer in the same language as the user query. "
+                    "Answer only from the provided retrieved products context. "
+                    "Do not mention or invent products that are not in the context. "
                     "If the context is insufficient, say that you only know the provided catalog matches."
                 ),
             },
@@ -89,6 +94,7 @@ def test_openai_compatible_answer_client_posts_grounded_prompt(monkeypatch) -> N
                 "role": "user",
                 "content": (
                     "Site ID: 77\n"
+                    "User query: ¿Qué pelota para perro recomendás?\n"
                     "Use only these retrieved products as evidence:\n"
                     "- Env Only Ball - Dog Toy | category: dog | summary: ball for dog fetch\n"
                     "Answer the user with a concise grounded summary of the matches."
@@ -176,7 +182,11 @@ def test_openai_compatible_answer_client_summarizes_http_errors(monkeypatch) -> 
     )
 
     with pytest.raises(LlmProviderHttpError) as excinfo:
-        client.from_catalog(site_id=77, context=ResponseContext(products=[]))
+        client.from_catalog(
+            site_id=77,
+            query="env ball",
+            context=ResponseContext(products=[]),
+        )
 
     message = str(excinfo.value)
     assert message.startswith("LLM provider request failed with HTTP 400: ")
@@ -218,7 +228,11 @@ def test_openai_compatible_answer_client_truncates_sanitized_http_error_body(
     )
 
     with pytest.raises(LlmProviderHttpError) as excinfo:
-        client.from_catalog(site_id=77, context=ResponseContext(products=[]))
+        client.from_catalog(
+            site_id=77,
+            query="env ball",
+            context=ResponseContext(products=[]),
+        )
 
     message = str(excinfo.value)
     assert "header-secret" not in message

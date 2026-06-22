@@ -10,7 +10,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 class AnswerGenerator(Protocol):
-    def from_catalog(self, site_id: int, context: ResponseContext) -> str: ...
+    def from_catalog(
+        self, site_id: int, query: str, context: ResponseContext
+    ) -> str: ...
 
     def off_topic(self) -> str: ...
 
@@ -18,7 +20,7 @@ class AnswerGenerator(Protocol):
 
 
 class DeterministicAnswerGenerator:
-    def from_catalog(self, site_id: int, context: ResponseContext) -> str:
+    def from_catalog(self, site_id: int, query: str, context: ResponseContext) -> str:
         return self._deterministic_from_catalog(site_id, context)
 
     def _deterministic_from_catalog(
@@ -42,11 +44,11 @@ class LlmAnswerGenerator:
         self._llm_client = llm_client
         self._fallback = DeterministicAnswerGenerator()
 
-    def from_catalog(self, site_id: int, context: ResponseContext) -> str:
-        fallback = self._fallback.from_catalog(site_id, context)
+    def from_catalog(self, site_id: int, query: str, context: ResponseContext) -> str:
+        fallback = self._fallback.from_catalog(site_id, query, context)
 
         try:
-            answer = self._llm_client.from_catalog(site_id, context)
+            answer = self._llm_client.from_catalog(site_id, query, context)
         except Exception as exc:
             LOGGER.warning(
                 "LLM answer generation failed; using deterministic fallback. error=%s",

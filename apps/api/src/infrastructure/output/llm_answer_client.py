@@ -53,7 +53,7 @@ class OpenAICompatibleAnswerClient:
         self._url = build_llm_chat_completions_url(base_url)
         self._timeout_seconds = timeout_seconds
 
-    def from_catalog(self, site_id: int, context: ResponseContext) -> str:
+    def from_catalog(self, site_id: int, query: str, context: ResponseContext) -> str:
         payload = {
             "model": self._model,
             "temperature": 0,
@@ -61,14 +61,15 @@ class OpenAICompatibleAnswerClient:
                 {
                     "role": "system",
                     "content": (
-                        "Answer only from the provided catalog context. "
-                        "Do not mention products that are not in the context. "
+                        "Answer in the same language as the user query. "
+                        "Answer only from the provided retrieved products context. "
+                        "Do not mention or invent products that are not in the context. "
                         "If the context is insufficient, say that you only know the provided catalog matches."
                     ),
                 },
                 {
                     "role": "user",
-                    "content": self._build_prompt(site_id, context),
+                    "content": self._build_prompt(site_id, query, context),
                 },
             ],
         }
@@ -94,13 +95,14 @@ class OpenAICompatibleAnswerClient:
 
         return str(body["choices"][0]["message"]["content"])
 
-    def _build_prompt(self, site_id: int, context: ResponseContext) -> str:
+    def _build_prompt(self, site_id: int, query: str, context: ResponseContext) -> str:
         products = "\n".join(
             f"- {product.title} | category: {product.category} | summary: {product.summary}"
             for product in context.products
         )
         return (
             f"Site ID: {site_id}\n"
+            f"User query: {query}\n"
             "Use only these retrieved products as evidence:\n"
             f"{products}\n"
             "Answer the user with a concise grounded summary of the matches."

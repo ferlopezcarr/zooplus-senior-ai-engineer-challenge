@@ -24,7 +24,11 @@ class ChatUseCase:
         if products:
             context = ResponseContext(products=products)
             return ChatResult(
-                answer=self._answer_generator.from_catalog(chat.site_id.value, context),
+                answer=self._answer_generator.from_catalog(
+                    chat.site_id.value,
+                    chat.query.value,
+                    context,
+                ),
                 retrieved_products=context.products,
             )
 

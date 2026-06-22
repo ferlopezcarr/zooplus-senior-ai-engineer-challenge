@@ -144,8 +144,9 @@ def test_chat_endpoint_uses_llm_answer_when_configured(
             assert base_url == "https://example.test/v1"
             assert timeout_seconds == 2.0
 
-        def from_catalog(self, site_id: int, context) -> str:
+        def from_catalog(self, site_id: int, query: str, context) -> str:
             assert site_id == 77
+            assert query == "env ball"
             assert len(context.products) == 1
             return "Grounded answer from LLM"
 
@@ -201,8 +202,9 @@ def test_chat_endpoint_falls_back_when_llm_call_fails(
         def __init__(self, **kwargs) -> None:
             pass
 
-        def from_catalog(self, site_id: int, context) -> str:
+        def from_catalog(self, site_id: int, query: str, context) -> str:
             assert site_id == 77
+            assert query == "env ball"
             assert len(context.products) == 1
             raise TimeoutError("boom")
 
