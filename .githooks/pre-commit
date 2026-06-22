@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+
+printf '%s\n' 'Running API pre-commit checks...'
+
+cd "$repo_root/apps/api"
+
+make install
+uv run --group lint ruff format --check .
+make lint
+make test

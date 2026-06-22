@@ -38,4 +38,15 @@ make install
 make run
 ```
 
+## Optional local Git pre-commit hook
+
+From the repository root:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-commit
+```
+
+This installs the tracked pre-commit hook that runs the same `apps/api` checks as CI before each commit.
+
 For API-local execution and runtime details, start with [`apps/api/README.md`](apps/api/README.md).
