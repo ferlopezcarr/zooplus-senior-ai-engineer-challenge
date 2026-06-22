@@ -4,7 +4,7 @@ install:
 	uv sync --group test --group lint
 
 run:
-	uv run uvicorn main:build_app --factory --reload --host 0.0.0.0 --port 8000
+	uv run uvicorn main:build_app --factory --reload --host 127.0.0.1 --port 8000
 
 test:
 	uv run pytest tests -m "not e2e"
