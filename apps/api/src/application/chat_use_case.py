@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.application.response_context import ResponseContext
 from src.application.services.topic_service import is_off_topic
 from src.domain import Chat, ChatResult
 from src.infrastructure.output.product_retriever import ProductRetriever
@@ -12,10 +13,10 @@ class ChatUseCase:
     def handle(self, chat: Chat) -> ChatResult:
         products = self._retriever.retrieve(chat)
         if products:
-            titles = self._get_product_titles(products)
+            context = ResponseContext(products=products)
             return ChatResult(
-                answer=f"For site {chat.site_id.value}, I found these catalog matches: {titles}.",
-                retrieved_products=products,
+                answer=self._build_catalog_answer(chat.site_id.value, context),
+                retrieved_products=context.products,
             )
 
         if is_off_topic(chat.query.value):
@@ -29,5 +30,9 @@ class ChatUseCase:
             retrieved_products=[],
         )
 
-    def _get_product_titles(self, products: list) -> str:
-        return ", ".join(product.title for product in products)
+    def _build_catalog_answer(self, site_id: int, context: ResponseContext) -> str:
+        evidence = "; ".join(
+            f"{product.title} ({product.category}): {product.summary}"
+            for product in context.products
+        )
+        return f"For site {site_id}, I found these catalog matches: {evidence}."

@@ -20,7 +20,9 @@ PRODUCT_SEARCHABLE_FIELDS = (
 )
 
 REQUIRED_ROW_FIELDS = (
+    "article_id",
     "product_id",
+    "variant_id",
     "product_name",
     "variant_name",
     "site_id",
@@ -123,4 +125,10 @@ class ProductRetriever:
             missing = ", ".join(missing_fields)
             raise DatasetNotReadyError(
                 f"Catalog dataset is unavailable: row {index} is missing required fields: {missing}."
+            )
+
+        article_id = row.get("article_id")
+        if not isinstance(article_id, int) or isinstance(article_id, bool):
+            raise DatasetNotReadyError(
+                f"Catalog dataset is unavailable: row {index} has an invalid article_id."
             )

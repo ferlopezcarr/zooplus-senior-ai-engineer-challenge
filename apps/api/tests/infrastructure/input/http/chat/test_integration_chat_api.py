@@ -22,7 +22,9 @@ def test_chat_endpoint_uses_catalog_dataset_path_override(
         tmp_path,
         [
             {
+                "article_id": 2001,
                 "product_id": "env-only-product",
+                "variant_id": "env-only-product-1",
                 "product_name": "Env Only Ball",
                 "variant_name": "Dog Toy",
                 "summary": "ball for dog fetch",
@@ -45,8 +47,11 @@ def test_chat_endpoint_uses_catalog_dataset_path_override(
     assert body["answer"]
     assert body["retrieved_products"] == [
         {
+            "article_id": 2001,
             "product_id": "env-only-product",
+            "variant_id": "env-only-product-1",
             "title": "Env Only Ball - Dog Toy",
+            "summary": "ball for dog fetch",
             "site_id": 77,
             "category": "dog",
             "score": 2.0,
@@ -61,7 +66,9 @@ def test_chat_endpoint_allows_brand_only_catalog_queries(
         tmp_path,
         [
             {
+                "article_id": 3001,
                 "product_id": "brand-only-product",
+                "variant_id": "brand-only-product-1",
                 "product_name": "Sensitive Dry Food",
                 "variant_name": "12kg",
                 "summary": "complete nutrition",
@@ -80,8 +87,11 @@ def test_chat_endpoint_allows_brand_only_catalog_queries(
     assert response.status_code == 200
     assert response.json()["retrieved_products"] == [
         {
+            "article_id": 3001,
             "product_id": "brand-only-product",
+            "variant_id": "brand-only-product-1",
             "title": "Sensitive Dry Food - 12kg",
+            "summary": "complete nutrition",
             "site_id": 5,
             "category": "dog",
             "score": 1.0,
@@ -96,7 +106,9 @@ def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
         tmp_path,
         [
             {
+                "article_id": 4002,
                 "product_id": "beta-ball",
+                "variant_id": "beta-ball-1",
                 "product_name": "Beta Ball",
                 "variant_name": "Dog Toy",
                 "summary": "ball for dog play",
@@ -106,7 +118,9 @@ def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
                 "site_id": 1,
             },
             {
+                "article_id": 4001,
                 "product_id": "alpha-ball",
+                "variant_id": "alpha-ball-1",
                 "product_name": "Alpha Ball",
                 "variant_name": "Dog Toy",
                 "summary": "ball for dog play",
@@ -116,7 +130,9 @@ def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
                 "site_id": 1,
             },
             {
+                "article_id": 4000,
                 "product_id": "omega-ball",
+                "variant_id": "omega-ball-1",
                 "product_name": "Omega Ball",
                 "variant_name": "Dog Fetch",
                 "summary": "ball for dog fetch",
@@ -126,7 +142,9 @@ def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
                 "site_id": 1,
             },
             {
+                "article_id": 4999,
                 "product_id": "offsite-ball",
+                "variant_id": "offsite-ball-1",
                 "product_name": "Offsite Ball",
                 "variant_name": "Dog Fetch",
                 "summary": "ball for dog fetch",
@@ -147,25 +165,39 @@ def test_chat_endpoint_returns_dataset_backed_products_in_score_order(
     body = response.json()
 
     assert isinstance(body["answer"], str)
-    assert body["answer"]
+    assert body["answer"] == (
+        "For site 1, I found these catalog matches: "
+        "Omega Ball - Dog Fetch (dog): ball for dog fetch; "
+        "Alpha Ball - Dog Toy (dog): ball for dog play; "
+        "Beta Ball - Dog Toy (dog): ball for dog play."
+    )
     assert body["retrieved_products"] == [
         {
+            "article_id": 4000,
             "product_id": "omega-ball",
+            "variant_id": "omega-ball-1",
             "title": "Omega Ball - Dog Fetch",
+            "summary": "ball for dog fetch",
             "site_id": 1,
             "category": "dog",
             "score": 3.0,
         },
         {
+            "article_id": 4001,
             "product_id": "alpha-ball",
+            "variant_id": "alpha-ball-1",
             "title": "Alpha Ball - Dog Toy",
+            "summary": "ball for dog play",
             "site_id": 1,
             "category": "dog",
             "score": 2.0,
         },
         {
+            "article_id": 4002,
             "product_id": "beta-ball",
+            "variant_id": "beta-ball-1",
             "title": "Beta Ball - Dog Toy",
+            "summary": "ball for dog play",
             "site_id": 1,
             "category": "dog",
             "score": 2.0,
@@ -180,7 +212,9 @@ def test_chat_endpoint_ignores_dataset_rows_with_boolean_site_ids(
         tmp_path,
         [
             {
+                "article_id": 5000,
                 "product_id": "boolean-site-row",
+                "variant_id": "boolean-site-row-1",
                 "product_name": "Boolean Site Ball",
                 "variant_name": "Dog Fetch",
                 "summary": "dog ball fetch",
@@ -190,7 +224,9 @@ def test_chat_endpoint_ignores_dataset_rows_with_boolean_site_ids(
                 "site_id": True,
             },
             {
+                "article_id": 5001,
                 "product_id": "valid-site-row",
+                "variant_id": "valid-site-row-1",
                 "product_name": "Valid Site Ball",
                 "variant_name": "Dog Fetch",
                 "summary": "dog ball fetch",
@@ -209,8 +245,11 @@ def test_chat_endpoint_ignores_dataset_rows_with_boolean_site_ids(
     assert response.status_code == 200
     assert response.json()["retrieved_products"] == [
         {
+            "article_id": 5001,
             "product_id": "valid-site-row",
+            "variant_id": "valid-site-row-1",
             "title": "Valid Site Ball - Dog Fetch",
+            "summary": "dog ball fetch",
             "site_id": 1,
             "category": "dog",
             "score": 3.0,
@@ -331,6 +370,81 @@ def test_chat_endpoint_returns_503_when_dataset_rows_are_malformed(
     assert response.json() == {"detail": "Catalog dataset is unavailable."}
 
 
+def test_chat_endpoint_returns_503_when_article_id_is_not_an_integer(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "article_id": "not-int",
+                "product_id": "broken-product",
+                "variant_id": "broken-product-1",
+                "product_name": "Broken Food",
+                "variant_name": "1kg",
+                "summary": "dog food",
+                "description": "bad article id",
+                "pet_type": "dog",
+                "brands": "Broken",
+                "site_id": 1,
+            }
+        ],
+    )
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "dog food"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Catalog dataset is unavailable."}
+
+
+def test_chat_endpoint_normalizes_html_summary_in_answer_and_retrieved_products(
+    tmp_path: Path, monkeypatch
+) -> None:
+    dataset_path = _write_dataset(
+        tmp_path,
+        [
+            {
+                "article_id": 6001,
+                "product_id": "html-summary-product",
+                "variant_id": "html-summary-product-1",
+                "product_name": "Omega Ball",
+                "variant_name": "Dog Fetch",
+                "summary": "Ball for <b>dogs</b> &amp; cats",
+                "description": "html summary row",
+                "pet_type": "dog",
+                "brands": "Omega",
+                "site_id": 1,
+            }
+        ],
+    )
+    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
+
+    client = TestClient(build_app())
+    response = client.post("/chat", json={"site_id": 1, "query": "omega dogs"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": (
+            "For site 1, I found these catalog matches: "
+            "Omega Ball - Dog Fetch (dog): Ball for dogs & cats."
+        ),
+        "retrieved_products": [
+            {
+                "article_id": 6001,
+                "product_id": "html-summary-product",
+                "variant_id": "html-summary-product-1",
+                "title": "Omega Ball - Dog Fetch",
+                "summary": "Ball for dogs & cats",
+                "site_id": 1,
+                "category": "dog",
+                "score": 2.0,
+            }
+        ],
+    }
+
+
 def test_chat_endpoint_returns_503_when_dataset_root_json_is_not_an_array(
     tmp_path: Path,
     monkeypatch,
@@ -351,8 +465,11 @@ def test_http_model_package_exports_product_dto() -> None:
         answer="ok",
         retrieved_products=[
             ProductDTO(
+                article_id=1001,
                 product_id="sku-1",
+                variant_id="sku-1-red",
                 title="Toy",
+                summary="ball for fetch",
                 site_id=1,
                 category="dog",
                 score=1.0,

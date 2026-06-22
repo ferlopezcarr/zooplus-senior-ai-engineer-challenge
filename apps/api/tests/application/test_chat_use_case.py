@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from src.application.chat_use_case import ChatUseCase
-from src.domain import Chat, Query, SiteId
+from src.domain import Chat, Product, Query, SiteId
+from src.domain.service import normalize_text
 from src.infrastructure.output.product_retriever import ProductRetriever
 
 
@@ -24,6 +25,12 @@ def test_query_value_object_rejects_queries_without_searchable_terms() -> None:
 
 def test_query_value_object_normalizes_html_and_punctuation() -> None:
     assert Query("Cats &amp; Dogs!!").value == "cats dogs"
+
+
+def test_text_normalizer_service_normalizes_html_text_for_user_readable_output() -> (
+    None
+):
+    assert normalize_text("Best <b>Fish</b> &amp; Chips") == "Best Fish & Chips"
 
 
 def test_chat_use_case_refuses_off_topic_queries() -> None:
@@ -45,6 +52,33 @@ def test_chat_use_case_reports_no_results_without_inventing_products() -> None:
     assert result.retrieved_products == []
     assert "could not find" in result.answer.lower()
     assert "site 1" in result.answer.lower()
+
+
+def test_chat_use_case_builds_answer_from_same_product_context_it_returns() -> None:
+    product = Product(
+        article_id=5511354,
+        product_id="dog-ball",
+        variant_id="759837.1",
+        title="Env Only Ball - Dog Toy",
+        summary="ball for dog fetch",
+        site_id=77,
+        category="dog",
+        score=2.0,
+    )
+
+    class StubRetriever:
+        def retrieve(self, chat: Chat) -> list[Product]:
+            return [product]
+
+    use_case = ChatUseCase(StubRetriever())
+
+    result = use_case.handle(Chat(site_id=SiteId(77), query=Query("env ball")))
+
+    assert result.retrieved_products == [product]
+    assert result.answer == (
+        "For site 77, I found these catalog matches: "
+        "Env Only Ball - Dog Toy (dog): ball for dog fetch."
+    )
 
 
 def test_product_retriever_keeps_results_isolated_by_site() -> None:

@@ -15,8 +15,11 @@ def test_chat_model_package_exports_expected_symbols() -> None:
         answer="ok",
         retrieved_products=[
             ProductDTO(
+                article_id=1001,
                 product_id="sku-1",
+                variant_id="sku-1-red",
                 title="Toy",
+                summary="ball for fetch",
                 site_id=1,
                 category="dog",
                 score=1.0,
@@ -37,9 +40,12 @@ def test_product_retriever_is_importable_from_app_runtime() -> None:
 def test_output_product_mapper_keeps_runtime_product_shape() -> None:
     product = to_product(
         {
+            "article_id": 1001,
             "product_id": "sku-1",
+            "variant_id": "sku-1-red",
             "product_name": "Toy",
             "variant_name": "Large",
+            "summary": "ball for fetch",
             "pet_type": "dog",
         },
         site_id=1,
@@ -47,8 +53,11 @@ def test_output_product_mapper_keeps_runtime_product_shape() -> None:
     )
 
     assert product == Product(
+        article_id=1001,
         product_id="sku-1",
+        variant_id="sku-1-red",
         title="Toy - Large",
+        summary="ball for fetch",
         site_id=1,
         category="dog",
         score=2.0,

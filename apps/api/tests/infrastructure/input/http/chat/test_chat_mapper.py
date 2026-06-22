@@ -20,15 +20,21 @@ def test_to_chat_response_maps_result_products_into_product_dtos() -> None:
             answer="ok",
             retrieved_products=[
                 Product(
+                    article_id=1001,
                     product_id="sku-1",
+                    variant_id="sku-1-red",
                     title="Toy",
+                    summary="ball for fetch",
                     site_id=1,
                     category="dog",
                     score=2.0,
                 ),
                 Product(
+                    article_id=1002,
                     product_id="sku-2",
+                    variant_id="sku-2-blue",
                     title="Food",
+                    summary="kibble for adults",
                     site_id=1,
                     category="dog",
                     score=1.0,
@@ -40,9 +46,23 @@ def test_to_chat_response_maps_result_products_into_product_dtos() -> None:
     assert response.answer == "ok"
     assert response.retrieved_products == [
         ProductDTO(
-            product_id="sku-1", title="Toy", site_id=1, category="dog", score=2.0
+            article_id=1001,
+            product_id="sku-1",
+            variant_id="sku-1-red",
+            title="Toy",
+            summary="ball for fetch",
+            site_id=1,
+            category="dog",
+            score=2.0,
         ),
         ProductDTO(
-            product_id="sku-2", title="Food", site_id=1, category="dog", score=1.0
+            article_id=1002,
+            product_id="sku-2",
+            variant_id="sku-2-blue",
+            title="Food",
+            summary="kibble for adults",
+            site_id=1,
+            category="dog",
+            score=1.0,
         ),
     ]
