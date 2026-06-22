@@ -2,7 +2,7 @@
 
 ## Product catalog feed
 
-`product_catalog_feed.py` loads the static product catalog dataset into PostgreSQL for manual persistence and future retrieval work.
+`product_catalog_feed.py` loads the static product catalog dataset into PostgreSQL for the runtime `/chat` retrieval path.
 
 ### Prerequisites
 
@@ -20,7 +20,7 @@ Prefer the local `.env` workflow so Alembic and the feed script use the same val
 Example local-only value:
 
 ```dotenv
-PRODUCT_CATALOG_DATABASE_URL=postgresql+asyncpg://local_user:local_password@127.0.0.1:5432/local_db
+PRODUCT_CATALOG_DATABASE_URL=postgresql+asyncpg://<user>:<password>@example.test:5432/catalog
 ```
 
 One-time setup from `apps/api`:
@@ -43,4 +43,5 @@ uv run python scripts/product_catalog_feed.py
 - `--dry-run` validates and maps the dataset without opening a database connection.
 - The feed collapses duplicate source rows by `article_id` before upsert, so the current dataset loads as 287 unique catalog entries instead of 300 raw rows.
 - The upsert is safe to rerun and preserves existing non-null `embedding` values.
-- `POST /chat` still reads the JSON dataset directly and does not use the database yet.
+- `POST /chat` requires `PRODUCT_CATALOG_DATABASE_URL` and reads `product_catalog_entries` from PostgreSQL at API startup.
+- The PostgreSQL path is still lexical/simple matching. Embeddings and vector similarity are intentionally deferred.

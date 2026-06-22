@@ -21,12 +21,11 @@ from src.infrastructure.output.llm_answer_client import (
     OpenAICompatibleAnswerClient,
     build_llm_chat_completions_url,
 )
-from src.infrastructure.output.product_retriever import ProductRetriever
-
-
-DEFAULT_DATASET_PATH = (
-    Path(__file__).resolve().parents[2] / "data/product_catalog_dataset.json"
+from src.infrastructure.output.product_database_retriever import (
+    PRODUCT_CATALOG_DATABASE_URL_ENV,
+    DatabaseProductRetriever,
 )
+
 DOTENV_PATH = Path(__file__).resolve().parent / ".env"
 
 LOGGER = logging.getLogger(__name__)
@@ -45,8 +44,7 @@ def build_app() -> FastAPI:
         description="FastAPI service exposing grounded catalog chat and health endpoints.",
     )
 
-    dataset_path = Path(getenv("CATALOG_DATASET_PATH", str(DEFAULT_DATASET_PATH)))
-    retriever = ProductRetriever(dataset_path)
+    retriever = _build_product_retriever()
 
     @app.get("/")
     async def root() -> Mapping[str, str]:
@@ -93,6 +91,31 @@ def _build_answer_generator() -> AnswerGenerator:
         timeout_seconds=timeout_seconds,
     )
     return LlmAnswerGenerator(client)
+
+
+def _build_product_retriever() -> DatabaseProductRetriever:
+    database_url = _get_non_blank_env(PRODUCT_CATALOG_DATABASE_URL_ENV)
+    if not database_url:
+        raise ValueError(
+            f"{PRODUCT_CATALOG_DATABASE_URL_ENV} must be set to a non-blank PostgreSQL connection string for runtime product retrieval."
+        )
+
+    retriever = DatabaseProductRetriever(database_url)
+    readiness_error = retriever.readiness_error()
+    if readiness_error:
+        LOGGER.warning(
+            "Catalog retrieval startup check failed for database_url=%s.",
+            _safe_log_url(database_url),
+        )
+        raise ValueError(
+            f"{PRODUCT_CATALOG_DATABASE_URL_ENV} must point to a ready PostgreSQL catalog database."
+        )
+
+    LOGGER.info(
+        "Catalog retrieval enabled from PostgreSQL database_url=%s.",
+        _safe_log_url(database_url),
+    )
+    return retriever
 
 
 def _get_non_blank_env(name: str) -> str | None:

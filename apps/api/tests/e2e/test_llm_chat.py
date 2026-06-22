@@ -1,53 +1,47 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
 import main
+from src.infrastructure.output.product_database_retriever import (
+    DatabaseProductRetriever,
+)
 
 
 pytestmark = pytest.mark.e2e
 
 _DETERMINISTIC_PREFIX = "For site "
-
-
-def _write_dataset(tmp_path: Path) -> Path:
-    dataset_path = tmp_path / "catalog.json"
-    dataset_path.write_text(
-        json.dumps(
-            [
-                {
-                    "article_id": 1001,
-                    "product_id": "sensitive-salmon",
-                    "variant_id": "sensitive-salmon-1",
-                    "product_name": "Sensitive Salmon Food",
-                    "variant_name": "Adult Dog 12kg",
-                    "summary": "dog food for sensitive stomach",
-                    "description": "gentle dry food for adult dogs",
-                    "pet_type": "dog",
-                    "brands": "Calm Paws",
-                    "site_id": 1,
-                },
-                {
-                    "article_id": 1002,
-                    "product_id": "pienso-cordero",
-                    "variant_id": "pienso-cordero-1",
-                    "product_name": "Pienso Cordero",
-                    "variant_name": "Perro Adulto 10kg",
-                    "summary": "pienso para perro sensible",
-                    "description": "comida seca suave para digestion delicada",
-                    "pet_type": "dog",
-                    "brands": "Mascota Feliz",
-                    "site_id": 1,
-                },
-            ]
-        )
-    )
-    return dataset_path
+TEST_DATABASE_URL = (
+    "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+)
+CATALOG_ROWS = [
+    {
+        "article_id": 1001,
+        "product_id": "sensitive-salmon",
+        "variant_id": "sensitive-salmon-1",
+        "product_name": "Sensitive Salmon Food",
+        "variant_name": "Adult Dog 12kg",
+        "summary": "dog food for sensitive stomach",
+        "description": "gentle dry food for adult dogs",
+        "pet_type": "dog",
+        "brands": "Calm Paws",
+        "site_id": 1,
+    },
+    {
+        "article_id": 1002,
+        "product_id": "pienso-cordero",
+        "variant_id": "pienso-cordero-1",
+        "product_name": "Pienso Cordero",
+        "variant_name": "Perro Adulto 10kg",
+        "summary": "pienso para perro sensible",
+        "description": "comida seca suave para digestion delicada",
+        "pet_type": "dog",
+        "brands": "Mascota Feliz",
+        "site_id": 1,
+    },
+]
 
 
 def _require_local_llm_config() -> None:
@@ -64,10 +58,29 @@ def _require_local_llm_config() -> None:
     )
 
 
-def _build_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def _build_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     _require_local_llm_config()
     monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
-    monkeypatch.setenv("CATALOG_DATASET_PATH", str(_write_dataset(tmp_path)))
+    monkeypatch.setenv("PRODUCT_CATALOG_DATABASE_URL", TEST_DATABASE_URL)
+
+    class StubDatabaseProductRetriever:
+        def __init__(self, database_url: str) -> None:
+            assert database_url == TEST_DATABASE_URL
+            self._delegate = DatabaseProductRetriever(database_url)
+
+            async def _load_rows_for_site(site_id: int, query_terms: set[str]):
+                del query_terms
+                return [row for row in CATALOG_ROWS if row["site_id"] == site_id]
+
+            self._delegate._load_rows_for_site = _load_rows_for_site  # type: ignore[method-assign]
+
+        def readiness_error(self) -> str | None:
+            return None
+
+        def retrieve(self, chat, limit: int = 3):
+            return self._delegate.retrieve(chat, limit=limit)
+
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
     return TestClient(main.build_app())
 
 
@@ -108,9 +121,9 @@ def _assert_grounded_llm_answer(body: dict[str, object], *, spanish: bool) -> No
 
 
 def test_chat_uses_real_llm_for_english_grounded_query(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = _build_client(tmp_path, monkeypatch)
+    client = _build_client(monkeypatch)
 
     response = client.post(
         "/chat",
@@ -122,9 +135,9 @@ def test_chat_uses_real_llm_for_english_grounded_query(
 
 
 def test_chat_uses_real_llm_for_spanish_grounded_query(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = _build_client(tmp_path, monkeypatch)
+    client = _build_client(monkeypatch)
 
     response = client.post(
         "/chat",

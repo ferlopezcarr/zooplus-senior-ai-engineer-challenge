@@ -7,14 +7,32 @@ from fastapi.testclient import TestClient
 import main
 
 
+TEST_DATABASE_URL = (
+    "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+)
+
+
 @pytest.fixture(autouse=True)
 def _clear_llm_env(monkeypatch) -> None:
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.delenv("LLM_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.setenv("PRODUCT_CATALOG_DATABASE_URL", TEST_DATABASE_URL)
     monkeypatch.setattr(main, "DOTENV_PATH", Path(".missing-test.env"))
     monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
+
+    class StubDatabaseProductRetriever:
+        def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
+
+        def readiness_error(self) -> str | None:
+            return None
+
+        def retrieve(self, chat, limit: int = 3):
+            return []
+
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
 
 
 def test_root_endpoint_returns_service_status() -> None:
@@ -36,47 +54,17 @@ def test_health_endpoint_returns_healthy_status() -> None:
     assert response.json() == {"status": "healthy"}
 
 
-def test_health_endpoint_stays_healthy_when_dataset_is_missing(
-    tmp_path: Path, monkeypatch
+@pytest.mark.parametrize("database_url", [None, "", "   "])
+def test_build_app_fails_fast_when_database_url_is_missing_or_blank(
+    database_url: str | None, monkeypatch
 ) -> None:
-    missing_dataset_path = tmp_path / "missing.json"
-    monkeypatch.setenv("CATALOG_DATASET_PATH", str(missing_dataset_path))
+    if database_url is None:
+        monkeypatch.delenv("PRODUCT_CATALOG_DATABASE_URL", raising=False)
+    else:
+        monkeypatch.setenv("PRODUCT_CATALOG_DATABASE_URL", database_url)
 
-    client = TestClient(main.build_app())
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
-
-
-def test_health_endpoint_stays_healthy_when_dataset_json_is_invalid(
-    tmp_path: Path, monkeypatch
-) -> None:
-    dataset_path = tmp_path / "invalid.json"
-    dataset_path.write_text("{not-valid-json")
-    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
-
-    client = TestClient(main.build_app())
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
-
-
-def test_health_endpoint_stays_healthy_when_dataset_rows_are_malformed(
-    tmp_path: Path, monkeypatch
-) -> None:
-    dataset_path = tmp_path / "invalid-rows.json"
-    dataset_path.write_text(
-        '[{"product_id":"broken-product","product_name":"Broken Food","site_id":1}]'
-    )
-    monkeypatch.setenv("CATALOG_DATASET_PATH", str(dataset_path))
-
-    client = TestClient(main.build_app())
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    with pytest.raises(ValueError, match="PRODUCT_CATALOG_DATABASE_URL"):
+        main.build_app()
 
 
 def test_build_app_fails_fast_for_invalid_llm_base_url_without_api_key(
@@ -138,6 +126,7 @@ def test_build_app_fails_fast_for_invalid_llm_base_url_with_api_key(
 def test_build_app_loads_llm_config_from_dotenv(tmp_path: Path, monkeypatch) -> None:
     dotenv_path = tmp_path / ".env"
     dotenv_path.write_text(
+        f"PRODUCT_CATALOG_DATABASE_URL={TEST_DATABASE_URL}\n"
         "LLM_API_KEY=secret\n"
         "LLM_MODEL=test-model\n"
         "LLM_BASE_URL=https://example.test/v1\n"
@@ -204,7 +193,8 @@ def test_build_app_logs_when_llm_generator_is_enabled(monkeypatch, caplog) -> No
         for record in caplog.records
         if record.levelno == logging.INFO and record.name == main.__name__
     ] == [
-        "LLM answer generation enabled with model=test-model base_url=https://example.test/v1."
+        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+asyncpg://example.test:5432/catalog.",
+        "LLM answer generation enabled with model=test-model base_url=https://example.test/v1.",
     ]
 
 
@@ -273,7 +263,8 @@ def test_build_app_logs_llm_base_url_without_userinfo(monkeypatch, caplog) -> No
         for record in caplog.records
         if record.levelno == logging.INFO and record.name == main.__name__
     ] == [
-        "LLM answer generation enabled with model=test-model base_url=https://example.test/v1."
+        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+asyncpg://example.test:5432/catalog.",
+        "LLM answer generation enabled with model=test-model base_url=https://example.test/v1.",
     ]
 
 
@@ -322,7 +313,7 @@ def test_build_app_logs_missing_llm_base_url_warning_once_when_no_llm_config(
     tmp_path: Path, monkeypatch, caplog
 ) -> None:
     dotenv_path = tmp_path / ".env"
-    dotenv_path.write_text("# no llm config\n")
+    dotenv_path.write_text(f"PRODUCT_CATALOG_DATABASE_URL={TEST_DATABASE_URL}\n")
     monkeypatch.setattr(main, "DOTENV_PATH", dotenv_path)
     caplog.set_level(logging.WARNING)
 
@@ -338,7 +329,10 @@ def test_build_app_logs_missing_llm_key_warning_once_when_base_url_exists(
     tmp_path: Path, monkeypatch, caplog
 ) -> None:
     dotenv_path = tmp_path / ".env"
-    dotenv_path.write_text("LLM_BASE_URL=https://example.test/v1\n")
+    dotenv_path.write_text(
+        f"PRODUCT_CATALOG_DATABASE_URL={TEST_DATABASE_URL}\n"
+        "LLM_BASE_URL=https://example.test/v1\n"
+    )
     monkeypatch.setattr(main, "DOTENV_PATH", dotenv_path)
     caplog.set_level(logging.WARNING)
 
@@ -354,11 +348,118 @@ def test_build_app_fails_fast_for_invalid_llm_base_url_from_dotenv(
     tmp_path: Path, monkeypatch
 ) -> None:
     dotenv_path = tmp_path / ".env"
-    dotenv_path.write_text("LLM_API_KEY=secret\nLLM_BASE_URL=http://unsafe.test/v1\n")
+    dotenv_path.write_text(
+        f"PRODUCT_CATALOG_DATABASE_URL={TEST_DATABASE_URL}\n"
+        "LLM_API_KEY=secret\n"
+        "LLM_BASE_URL=http://unsafe.test/v1\n"
+    )
     monkeypatch.setattr(main, "DOTENV_PATH", dotenv_path)
 
     with pytest.raises(ValueError, match="LLM_BASE_URL"):
         main.build_app()
+
+
+def test_build_app_uses_database_retriever_when_database_url_is_configured(
+    monkeypatch, caplog
+) -> None:
+    captured: dict[str, str] = {}
+
+    class StubDatabaseProductRetriever:
+        def __init__(self, database_url: str) -> None:
+            captured["database_url"] = database_url
+
+        def readiness_error(self) -> str | None:
+            return None
+
+        def retrieve(self, chat, limit: int = 3):
+            return []
+
+    monkeypatch.setenv(
+        "PRODUCT_CATALOG_DATABASE_URL",
+        TEST_DATABASE_URL,
+    )
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    caplog.set_level(logging.INFO)
+
+    client = TestClient(main.build_app())
+
+    assert client.get("/health").status_code == 200
+    assert captured["database_url"] == TEST_DATABASE_URL
+    assert [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.INFO and record.name == main.__name__
+    ] == [
+        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+asyncpg://example.test:5432/catalog."
+    ]
+
+
+def test_build_app_fails_fast_when_database_retriever_is_not_ready(monkeypatch) -> None:
+    class StubDatabaseProductRetriever:
+        def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
+
+        def readiness_error(self) -> str | None:
+            return "missing product_catalog_entries table"
+
+    monkeypatch.setenv(
+        "PRODUCT_CATALOG_DATABASE_URL",
+        TEST_DATABASE_URL,
+    )
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+
+    with pytest.raises(ValueError, match="PRODUCT_CATALOG_DATABASE_URL"):
+        main.build_app()
+
+
+def test_build_app_retrieval_startup_error_stays_concise(monkeypatch) -> None:
+    class StubDatabaseProductRetriever:
+        def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
+
+        def readiness_error(self) -> str | None:
+            return "password authentication failed for user 'postgres'"
+
+    monkeypatch.setenv(
+        "PRODUCT_CATALOG_DATABASE_URL",
+        TEST_DATABASE_URL,
+    )
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+
+    with pytest.raises(ValueError) as exc_info:
+        main.build_app()
+
+    assert str(exc_info.value) == (
+        "PRODUCT_CATALOG_DATABASE_URL must point to a ready PostgreSQL catalog database."
+    )
+
+
+def test_build_app_does_not_log_raw_retrieval_startup_error(
+    monkeypatch, caplog
+) -> None:
+    class StubDatabaseProductRetriever:
+        def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
+
+        def readiness_error(self) -> str | None:
+            return "password authentication failed for user 'postgres'"
+
+    monkeypatch.setenv(
+        "PRODUCT_CATALOG_DATABASE_URL",
+        TEST_DATABASE_URL,
+    )
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    caplog.set_level(logging.WARNING)
+
+    with pytest.raises(ValueError):
+        main.build_app()
+
+    assert [record.getMessage() for record in caplog.records] == [
+        (
+            "Catalog retrieval startup check failed for "
+            "database_url=postgresql+asyncpg://example.test:5432/catalog."
+        )
+    ]
 
 
 def test_build_app_uses_default_llm_timeout_when_env_is_missing(monkeypatch) -> None:

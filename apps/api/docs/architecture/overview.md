@@ -10,7 +10,7 @@
 | --- | --- |
 | Web framework | FastAPI |
 | Language | Python 3.14 |
-| Local DB tooling kept for upcoming work | SQLAlchemy, Alembic, asyncpg, pgvector |
+| PostgreSQL retrieval and setup tooling | SQLAlchemy, Alembic, asyncpg, pgvector |
 | Dependency and command runner | `uv` |
 | Test runner | `pytest` |
 
@@ -53,11 +53,11 @@
 | --- | --- | --- |
 | `GET /` | Implemented | Returns service status metadata. |
 | `GET /health` | Implemented | Returns process/liveness status only. |
-| `POST /chat` | Implemented | Validates `site_id` and `query`, retrieves grounded catalog evidence, and returns a grounded JSON response or dataset-readiness failure. |
+| `POST /chat` | Implemented | Validates `site_id` and `query`, retrieves grounded catalog evidence from PostgreSQL, and returns a grounded JSON response or retrieval-unavailable failure. |
 
 ## Request Flow
 
-`HTTP request -> FastAPI route -> chat mapper -> chat use case -> dataset retrieval -> response context -> optional LLM or deterministic answer generation -> chat mapper -> HTTP JSON response`
+`HTTP request -> FastAPI route -> chat mapper -> chat use case -> PostgreSQL lexical retrieval -> response context -> optional LLM or deterministic answer generation -> chat mapper -> HTTP JSON response`
 
 - `ChatUseCase` always retrieves catalog products first.
 - Retrieved products are packaged into `ResponseContext` before answer generation.
@@ -69,8 +69,9 @@
 - Provider HTTP error diagnostics are sanitized before logging so secrets are not echoed back.
 - Manual local LLM e2e coverage exists via `make test-e2e`, but the default runtime and default test flow do not require LLM credentials.
 - The repository keeps local Docker Compose PostgreSQL + pgvector infrastructure under `infrastructure/local/docker-compose.yml`.
-- Manual persistence commands live under `apps/api` via Alembic and `python scripts/product_catalog_feed.py`; both commands load `apps/api/.env`, the feed preserves existing embeddings on rerun, and `POST /chat` still stays dataset-backed.
-- `build_app()` still does not create database connections or migration side effects, and `POST /chat` keeps the current dataset-backed behavior.
+- Manual persistence commands live under `apps/api` via Alembic and `python scripts/product_catalog_feed.py`; both commands load `apps/api/.env`, and the feed preserves existing embeddings on rerun.
+- `build_app()` requires `PRODUCT_CATALOG_DATABASE_URL`, selects PostgreSQL lexical retrieval for `/chat`, and fails fast when the database readiness check fails.
+- `build_app()` does not run Alembic or catalog feed commands at startup, the JSON dataset is feed-only, and embeddings/vector similarity remain deferred.
 
 ## Deployable Boundary
 

@@ -1,6 +1,8 @@
 # First Delivery Overview
 
-This document is the first standalone delivery note for the `apps/api` PoC. It summarizes the current scope, runtime design, exposed behavior, operational setup, and implementation trade-offs without changing the execution-oriented README.
+> Historical snapshot: this document records the first delivery milestone and is kept for historical context. For current-state behavior, use `overview.md` and the API specs.
+
+This document is the first standalone delivery note for the `apps/api` PoC. It summarizes that milestone's scope, runtime design, exposed behavior, operational setup, and implementation trade-offs without changing the execution-oriented README.
 
 ## Purpose and Scope
 

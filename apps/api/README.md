@@ -17,7 +17,7 @@ From the repository root:
 
 ```bash
 cd apps/api
-uv venv .venv
+uv venv .venv # Only needed once to create the local virtualenv.
 source .venv/bin/activate
 make install
 make run
@@ -25,6 +25,7 @@ make run
 
 - Python `>=3.14,<3.15` is required by `pyproject.toml`.
 - `make install` syncs runtime, test, and lint dependencies into the local uv-managed virtualenv.
+- Before `make run`, manually run Alembic plus `scripts/product_catalog_feed.py` so PostgreSQL is migrated and seeded for `/chat`.
 - `make run` starts the API on `http://127.0.0.1:8000`.
 
 ## Test
@@ -75,21 +76,25 @@ make lint
 - GET `/` returns service status metadata.
 - GET `/health` returns process/liveness status only.
 - POST `/chat` accepts `site_id` and `query`, then returns `answer` and `retrieved_products`.
-- `POST /chat` returns `503` with a clear dataset-readiness error when the catalog file is missing, unreadable, or malformed.
+- `POST /chat` returns `503` with a clear retrieval-unavailable error when the catalog backend fails during request handling.
+- `POST /chat` reads `product_catalog_entries` from PostgreSQL only.
 
 ## Configuration
 
-- `CATALOG_DATASET_PATH` optionally overrides the dataset path; the default points to `data/product_catalog_dataset.json` in the repository root.
+- `PRODUCT_CATALOG_DATABASE_URL` is required at runtime and must point to a migrated, seeded PostgreSQL database before the API starts.
+- If `PRODUCT_CATALOG_DATABASE_URL` is missing, blank, or points to an unavailable database/table, startup fails fast with a concise configuration error.
+- The JSON dataset remains a static source for `scripts/product_catalog_feed.py`; it is not a runtime retrieval source.
+- Retrieval is still lexical; embeddings/vector search remain deferred.
 - `.env` uses `python-dotenv`; `build_app()` loads `apps/api/.env` at startup with environment variables still taking precedence over file values.
 - Optional LLM answer generation is enabled only when both `LLM_BASE_URL` and `LLM_API_KEY` are non-blank after `.env` loading. If either one is missing, the app logs a one-time startup warning and uses `DeterministicAnswerGenerator`. If `LLM_BASE_URL` is present but invalid, startup fails fast. `LLM_MODEL` still defaults to `gpt-4o-mini`. `LLM_TIMEOUT_SECONDS` defaults to `10` when missing or blank, and must parse as a positive integer or float when LLM mode is enabled. `LLM_API_KEY=replace-me` is treated like any other configured key value.
 - Dependency management uses `uv` through the local `apps/api/Makefile`.
 
 ## Layout
 
-- `main.py` contains FastAPI wiring and dataset-path configuration.
+- `main.py` contains FastAPI wiring plus required PostgreSQL retrieval selection.
 - `src/domain` defines chat request/result value objects.
 - `src/domain/service/text_normalizer_service.py` owns shared query normalization.
 - `src/application` contains the chat use case.
 - `src/infrastructure/input/http` exposes the FastAPI `POST /chat` adapter.
-- `src/infrastructure/output` contains dataset loading and row-to-domain mapping.
+- `src/infrastructure/output` contains retrieval adapters and row-to-domain mapping.
 - `tests/` contains focused unit and integration coverage for the current runtime.

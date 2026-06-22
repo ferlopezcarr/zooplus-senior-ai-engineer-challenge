@@ -8,14 +8,16 @@ from src.infrastructure.input.http.chat.service import (
     to_chat_response,
 )
 from src.infrastructure.input.http.chat.model import ChatRequest, ChatResponse
-from src.infrastructure.output.product_retriever import DatasetNotReadyError
+from src.infrastructure.output.product_database_retriever import (
+    CatalogDatabaseUnavailableError,
+)
 
 
 def build_chat_router(use_case: ChatUseCase) -> APIRouter:
     router = APIRouter()
 
     @router.post("/chat", response_model=ChatResponse)
-    async def chat_endpoint(body: ChatRequest) -> ChatResponse:
+    def chat_endpoint(body: ChatRequest) -> ChatResponse:
         try:
             chat = to_chat(body)
         except ValueError as exc:
@@ -23,10 +25,10 @@ def build_chat_router(use_case: ChatUseCase) -> APIRouter:
 
         try:
             return to_chat_response(use_case.handle(chat))
-        except DatasetNotReadyError as exc:
+        except CatalogDatabaseUnavailableError as exc:
             raise HTTPException(
                 status_code=503,
-                detail="Catalog dataset is unavailable.",
+                detail="Catalog retrieval is unavailable.",
             ) from exc
 
     return router

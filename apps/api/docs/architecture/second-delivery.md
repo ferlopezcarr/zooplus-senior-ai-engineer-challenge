@@ -1,6 +1,8 @@
 # Second Delivery Overview
 
-This document records the second delivery delta for the `apps/api` PoC. It captures the latest runtime additions without rewriting the first delivery snapshot.
+> Historical snapshot: this document records the second delivery milestone delta and is kept for historical context. For current-state behavior, use `overview.md` and the API specs.
+
+This document records the second delivery delta for the `apps/api` PoC. It captures that milestone's runtime additions without rewriting the first delivery snapshot.
 
 ## Delivery Delta
 

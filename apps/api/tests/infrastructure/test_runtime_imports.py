@@ -11,7 +11,9 @@ from src.infrastructure.input.http.chat.model import (
     ChatResponse,
     ProductDTO,
 )
-from src.infrastructure.output.product_retriever import ProductRetriever
+from src.infrastructure.output.product_database_retriever import (
+    DatabaseProductRetriever,
+)
 from src.infrastructure.output.service import to_product
 
 
@@ -38,8 +40,11 @@ def test_chat_model_package_exports_expected_symbols() -> None:
     assert isinstance(response.retrieved_products[0], ProductDTO)
 
 
-def test_product_retriever_is_importable_from_app_runtime() -> None:
-    assert ProductRetriever.__module__ == "src.infrastructure.output.product_retriever"
+def test_database_product_retriever_is_importable_from_app_runtime() -> None:
+    assert (
+        DatabaseProductRetriever.__module__
+        == "src.infrastructure.output.product_database_retriever"
+    )
 
 
 def test_application_symbols_resolve_from_canonical_packages() -> None:

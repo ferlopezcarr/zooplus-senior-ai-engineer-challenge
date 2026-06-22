@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import logging
 import pytest
 
@@ -13,10 +11,39 @@ from src.application.model.response_context import ResponseContext
 from src.application.use_case.chat_use_case import ChatUseCase
 from src.domain.model import Chat, Product, Query, SiteId
 from src.domain.service import normalize_text
-from src.infrastructure.output.product_retriever import ProductRetriever
+from src.infrastructure.output.product_database_retriever import (
+    DatabaseProductRetriever,
+)
 
 
-DATASET_PATH = Path(__file__).resolve().parents[4] / "data/product_catalog_dataset.json"
+def _stub_retriever(products: list[Product]):
+    class StubRetriever:
+        def retrieve(self, chat: Chat) -> list[Product]:
+            return products
+
+    return StubRetriever()
+
+
+def _database_retriever(rows: list[dict[str, object]]) -> DatabaseProductRetriever:
+    retriever = DatabaseProductRetriever(
+        "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+    )
+
+    async def _load_rows_for_site(
+        site_id: int,
+        query_terms: set[str],
+    ) -> list[dict[str, object]]:
+        del query_terms
+        return [
+            row
+            for row in rows
+            if isinstance(row["site_id"], int)
+            and not isinstance(row["site_id"], bool)
+            and row["site_id"] == site_id
+        ]
+
+    retriever._load_rows_for_site = _load_rows_for_site  # type: ignore[method-assign]
+    return retriever
 
 
 def test_query_value_object_rejects_blank_queries() -> None:
@@ -27,6 +54,11 @@ def test_query_value_object_rejects_blank_queries() -> None:
 def test_query_value_object_rejects_queries_without_searchable_terms() -> None:
     with pytest.raises(ValueError, match="searchable"):
         Query("!!! &amp; ???")
+
+
+def test_query_value_object_rejects_overlong_queries() -> None:
+    with pytest.raises(ValueError, match="at most 500 characters"):
+        Query("a" * 501)
 
 
 def test_query_value_object_normalizes_html_and_punctuation() -> None:
@@ -48,7 +80,7 @@ def test_text_normalizer_service_normalizes_html_text_for_user_readable_output()
 
 
 def test_chat_use_case_refuses_off_topic_queries() -> None:
-    use_case = ChatUseCase(ProductRetriever(DATASET_PATH))
+    use_case = ChatUseCase(_stub_retriever([]))
 
     result = use_case.handle(
         Chat(site_id=SiteId(1), query=Query("what is the weather today"))
@@ -59,7 +91,7 @@ def test_chat_use_case_refuses_off_topic_queries() -> None:
 
 
 def test_chat_use_case_reports_no_results_without_inventing_products() -> None:
-    use_case = ChatUseCase(ProductRetriever(DATASET_PATH))
+    use_case = ChatUseCase(_stub_retriever([]))
 
     result = use_case.handle(Chat(site_id=SiteId(1), query=Query("hamster submarine")))
 
@@ -302,8 +334,35 @@ def test_chat_use_case_passes_raw_query_into_answer_generation() -> None:
     assert result.retrieved_products == [product]
 
 
-def test_product_retriever_keeps_results_isolated_by_site() -> None:
-    retriever = ProductRetriever(DATASET_PATH)
+def test_database_retriever_keeps_results_isolated_by_site() -> None:
+    retriever = _database_retriever(
+        [
+            {
+                "article_id": 1001,
+                "product_id": "site-three",
+                "variant_id": "site-three-1",
+                "product_name": "Eukanuba Adult",
+                "variant_name": "3kg",
+                "summary": "complete nutrition",
+                "description": "eukanuba dog food",
+                "pet_type": "dog",
+                "brands": "Eukanuba",
+                "site_id": 3,
+            },
+            {
+                "article_id": 1002,
+                "product_id": "site-fifteen",
+                "variant_id": "site-fifteen-1",
+                "product_name": "Eukanuba Adult",
+                "variant_name": "15kg",
+                "summary": "complete nutrition",
+                "description": "eukanuba dog food",
+                "pet_type": "dog",
+                "brands": "Eukanuba",
+                "site_id": 15,
+            },
+        ]
+    )
 
     site_three_results = retriever.retrieve(
         Chat(site_id=SiteId(3), query=Query("eukanuba"))
