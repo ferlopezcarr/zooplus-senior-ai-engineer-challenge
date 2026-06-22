@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.domain import Chat, ChatResult, Product, Query, SiteId
+from src.domain.model import Chat, ChatResult, Product, Query, SiteId
 from src.infrastructure.input.http.chat.model import (
     ChatRequest,
     ChatResponse,

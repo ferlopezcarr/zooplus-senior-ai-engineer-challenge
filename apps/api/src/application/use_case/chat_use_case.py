@@ -4,9 +4,9 @@ from src.application.answer_generator import (
     AnswerGenerator,
     DeterministicAnswerGenerator,
 )
-from src.application.response_context import ResponseContext
+from src.application.model.response_context import ResponseContext
 from src.application.services.topic_service import is_off_topic
-from src.domain import Chat, ChatResult
+from src.domain.model import Chat, ChatResult
 from src.infrastructure.output.product_retriever import ProductRetriever
 
 

@@ -4,8 +4,7 @@ import json
 from functools import cached_property
 from pathlib import Path
 
-from src.domain.chat import Chat
-from src.domain import Product
+from src.domain.model import Chat, Product
 from src.domain.service.text_normalizer_service import normalize_query
 from src.infrastructure.output.service import to_product
 

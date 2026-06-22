@@ -14,7 +14,7 @@ from src.application.answer_generator import (
     DeterministicAnswerGenerator,
     LlmAnswerGenerator,
 )
-from src.application.chat_use_case import ChatUseCase
+from src.application.use_case.chat_use_case import ChatUseCase
 from src.infrastructure.input.http.chat.chat_route import build_chat_router
 from src.infrastructure.output.llm_answer_client import (
     DEFAULT_LLM_TIMEOUT_SECONDS,

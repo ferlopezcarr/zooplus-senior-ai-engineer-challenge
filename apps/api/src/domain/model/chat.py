@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.domain.query import Query
-from src.domain.site_id import SiteId
+from src.domain.model.query import Query
+from src.domain.model.site_id import SiteId
 
 
 @dataclass(frozen=True)

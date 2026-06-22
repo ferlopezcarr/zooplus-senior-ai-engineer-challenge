@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.domain import Product
+from src.domain.model import Product
 from src.domain.service.text_normalizer_service import normalize_text
 
 

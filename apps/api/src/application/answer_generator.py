@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
-from src.application.response_context import ResponseContext
+from src.application.model.response_context import ResponseContext
 
 
 LOGGER = logging.getLogger(__name__)

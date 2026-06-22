@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.domain.product import Product
+from src.domain.model.product import Product
 
 
 @dataclass(frozen=True)

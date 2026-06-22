@@ -9,9 +9,9 @@ from src.application.answer_generator import (
     DeterministicAnswerGenerator,
     LlmAnswerGenerator,
 )
-from src.application.chat_use_case import ChatUseCase
-from src.application.response_context import ResponseContext
-from src.domain import Chat, Product, Query, SiteId
+from src.application.model.response_context import ResponseContext
+from src.application.use_case.chat_use_case import ChatUseCase
+from src.domain.model import Chat, Product, Query, SiteId
 from src.domain.service import normalize_text
 from src.infrastructure.output.product_retriever import ProductRetriever
 

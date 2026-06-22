@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.domain import Chat, ChatResult, Product, Query, SiteId
+from src.domain.model import Chat, ChatResult, Product, Query, SiteId
 from src.infrastructure.input.http.chat.service.chat_mapper import (
     to_chat,
     to_chat_response,

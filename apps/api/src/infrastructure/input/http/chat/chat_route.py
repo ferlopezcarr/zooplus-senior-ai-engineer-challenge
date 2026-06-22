@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from src.application.chat_use_case import ChatUseCase
+from src.application.use_case.chat_use_case import ChatUseCase
 from src.infrastructure.input.http.chat.service import (
     to_chat,
     to_chat_response,

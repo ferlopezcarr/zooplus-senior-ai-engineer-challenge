@@ -3,7 +3,9 @@ from __future__ import annotations
 import importlib
 import sys
 
-from src.domain import Product
+from src.application.model.response_context import ResponseContext
+from src.application.use_case.chat_use_case import ChatUseCase
+from src.domain.model import Product
 from src.infrastructure.input.http.chat.model import (
     ChatRequest,
     ChatResponse,
@@ -38,6 +40,11 @@ def test_chat_model_package_exports_expected_symbols() -> None:
 
 def test_product_retriever_is_importable_from_app_runtime() -> None:
     assert ProductRetriever.__module__ == "src.infrastructure.output.product_retriever"
+
+
+def test_application_symbols_resolve_from_canonical_packages() -> None:
+    assert ChatUseCase.__module__ == "src.application.use_case.chat_use_case"
+    assert ResponseContext.__module__ == "src.application.model.response_context"
 
 
 def test_output_product_mapper_keeps_runtime_product_shape() -> None:
