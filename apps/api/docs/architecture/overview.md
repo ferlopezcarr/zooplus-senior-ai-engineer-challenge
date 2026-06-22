@@ -31,7 +31,7 @@
 | `src/infrastructure/input` | Input adapter boundary. |
 | `src/infrastructure/input/http/chat` | HTTP chat adapter boundary for route wiring and transport/domain mapping. |
 | `src/infrastructure/input/http/chat/model` | HTTP DTO boundary for request, response, and nested transport models. |
-| `src/infrastructure/output` | Output adapter boundary for dataset-backed retrieval and optional external answer generation. |
+| `src/infrastructure/output` | Output adapter boundary for runtime retrieval, optional external answer generation, and related adapter helpers. |
 | `src/infrastructure/output/llm_answer_client.py` | OpenAI-compatible HTTP client for optional answer synthesis from retrieved catalog context. |
 | `src/infrastructure/output/service` | Output-adapter helpers for row-to-domain mapping. |
 | `tests` | API-local regression coverage. |
@@ -68,7 +68,9 @@
 - If the provider request fails, the use case returns the deterministic catalog-grounded answer instead.
 - Provider HTTP error diagnostics are sanitized before logging so secrets are not echoed back.
 - Manual local LLM e2e coverage exists via `make test-e2e`, but the default runtime and default test flow do not require LLM credentials.
-- The repository keeps local Docker Compose PostgreSQL + pgvector infrastructure under `infrastructure/local/docker-compose.yml` plus dependency pins for future work, but `build_app()` does not create database connections or migration side effects yet.
+- The repository keeps local Docker Compose PostgreSQL + pgvector infrastructure under `infrastructure/local/docker-compose.yml`.
+- Manual persistence commands live under `apps/api` via Alembic and `python scripts/product_catalog_feed.py`; both commands load `apps/api/.env`, the feed preserves existing embeddings on rerun, and `POST /chat` still stays dataset-backed.
+- `build_app()` still does not create database connections or migration side effects, and `POST /chat` keeps the current dataset-backed behavior.
 
 ## Deployable Boundary
 

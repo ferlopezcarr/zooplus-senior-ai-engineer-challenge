@@ -7,7 +7,8 @@ Local execution guide for the current `apps/api` service.
 - `docs/architecture/overview.md` for API runtime structure.
 - `docs/specs/assistant-api-runtime.md` for the current HTTP contract.
 - `docs/specs/dataset-grounded-retrieval.md` for the current retrieval boundary.
-- `../../infrastructure/local/README.md` for optional local Docker/PostgreSQL usage.
+- `../../infrastructure/local/README.md` for local PostgreSQL/pgvector startup.
+- `scripts/README.md` for the static product catalog feed.
 - `requests/*.http` for minimal local request examples.
 
 ## Local startup from zero
@@ -25,6 +26,14 @@ make run
 - Python `>=3.14,<3.15` is required by `pyproject.toml`.
 - `make install` syncs runtime, test, and lint dependencies into the local uv-managed virtualenv.
 - `make run` starts the API on `http://127.0.0.1:8000`.
+
+## Test
+
+Run from `apps/api`:
+
+```bash
+make test
+```
 
 ## Manual LLM check
 
@@ -55,10 +64,10 @@ make test-e2e
 - They load the same local `.env` path as the app runtime and skip cleanly when `LLM_BASE_URL` or `LLM_API_KEY` is missing or blank.
 - `make test`, CI, and the tracked pre-commit flow stay on the default suite because `e2e` tests are excluded there.
 
-## Format
+## Lint
 
 ```bash
-make format
+make lint
 ```
 
 ## Current Routes

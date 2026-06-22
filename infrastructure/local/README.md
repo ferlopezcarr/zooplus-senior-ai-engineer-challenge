@@ -22,4 +22,4 @@ docker compose down
 
 - PostgreSQL is published on `127.0.0.1` only.
 - Active credentials come from your local `.env` file in this directory; the Compose file does not bake in `postgres/postgres` defaults.
-- `POST /chat` in `apps/api` does not use PostgreSQL yet. This is local infrastructure only for upcoming work.
+- Set the app-side `PRODUCT_CATALOG_DATABASE_URL` separately in `apps/api/.env` as documented in `apps/api/scripts/README.md`.
