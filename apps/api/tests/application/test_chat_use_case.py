@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from src.application.answer_generator import AnswerGenerator
 from src.application.chat_use_case import ChatUseCase
+from src.application.response_context import ResponseContext
 from src.domain import Chat, Product, Query, SiteId
 from src.domain.service import normalize_text
 from src.infrastructure.output.product_retriever import ProductRetriever
@@ -76,6 +78,31 @@ def test_chat_use_case_builds_answer_from_same_product_context_it_returns() -> N
 
     assert result.retrieved_products == [product]
     assert result.answer == (
+        "For site 77, I found these catalog matches: "
+        "Env Only Ball - Dog Toy (dog): ball for dog fetch."
+    )
+
+
+def test_answer_generator_builds_catalog_answer_from_response_context() -> None:
+    generator = AnswerGenerator()
+    context = ResponseContext(
+        products=[
+            Product(
+                article_id=5511354,
+                product_id="dog-ball",
+                variant_id="759837.1",
+                title="Env Only Ball - Dog Toy",
+                summary="ball for dog fetch",
+                site_id=77,
+                category="dog",
+                score=2.0,
+            )
+        ]
+    )
+
+    answer = generator.from_catalog(site_id=77, context=context)
+
+    assert answer == (
         "For site 77, I found these catalog matches: "
         "Env Only Ball - Dog Toy (dog): ball for dog fetch."
     )

@@ -5,6 +5,7 @@ from os import getenv
 from pathlib import Path
 
 from fastapi import FastAPI
+from src.application.answer_generator import AnswerGenerator
 from src.application.chat_use_case import ChatUseCase
 from src.infrastructure.input.http.chat.chat_route import build_chat_router
 from src.infrastructure.output.product_retriever import ProductRetriever
@@ -39,7 +40,7 @@ def build_app() -> FastAPI:
 
         return {"status": "healthy"}
 
-    use_case = ChatUseCase(retriever)
+    use_case = ChatUseCase(retriever, answer_generator=AnswerGenerator())
     app.include_router(build_chat_router(use_case))
 
     return app
