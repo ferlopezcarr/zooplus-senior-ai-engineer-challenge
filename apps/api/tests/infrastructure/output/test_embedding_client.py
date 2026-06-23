@@ -17,11 +17,20 @@ def test_build_embeddings_url_rejects_non_https_url() -> None:
         build_embeddings_url("http://embeddings.example.test/v1")
 
 
+def test_build_embeddings_url_accepts_complete_embeddings_endpoint() -> None:
+    assert (
+        build_embeddings_url(
+            "https://generativelanguage.googleapis.com/v1beta/openai/embeddings"
+        )
+        == "https://generativelanguage.googleapis.com/v1beta/openai/embeddings"
+    )
+
+
 def test_embed_raises_safe_error_for_http_failure(monkeypatch) -> None:
     client = OpenAICompatibleEmbeddingClient(
         api_key="secret",
         model="test-model",
-        base_url="https://embeddings.example.test/v1",
+        base_url="https://embeddings.example.test/v1/embeddings",
     )
 
     def _raise_http_error(request, timeout):
@@ -47,7 +56,7 @@ def test_embed_raises_safe_error_for_malformed_body(monkeypatch) -> None:
     client = OpenAICompatibleEmbeddingClient(
         api_key="secret",
         model="test-model",
-        base_url="https://embeddings.example.test/v1",
+        base_url="https://embeddings.example.test/v1/embeddings",
     )
 
     class StubResponse:

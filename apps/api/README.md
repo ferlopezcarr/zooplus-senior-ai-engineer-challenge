@@ -76,6 +76,7 @@ uv run python scripts/product_catalog_feed.py
 4. Optional provider paths:
    - Set `LLM_BASE_URL` + `LLM_API_KEY` to verify provider-backed `/public/chat` answers.
    - Set `INTERNAL_API_TOKEN` + `EMBEDDING_BASE_URL` + `EMBEDDING_API_KEY` + `EMBEDDING_MODEL` to verify `POST /internal/products/{article_id}/embedding`.
+   - `EMBEDDING_BASE_URL` must be the complete HTTPS embeddings endpoint URL ending in `/embeddings`.
 
 Run from `apps/api`:
 
@@ -118,7 +119,7 @@ make lint
 - Optional LLM answer generation is enabled only when both `LLM_BASE_URL` and `LLM_API_KEY` are non-blank after `.env` loading. If either one is missing, the app logs a one-time startup warning and uses `DeterministicAnswerGenerator`. If `LLM_BASE_URL` is present but invalid, startup fails fast. `LLM_MODEL` still defaults to `gpt-4o-mini`. `LLM_TIMEOUT_SECONDS` defaults to `10` when missing or blank, and must parse as a positive integer or float when LLM mode is enabled. `LLM_API_KEY=replace-me` is treated like any other configured key value.
 - `INTERNAL_API_TOKEN` enables `/internal/*`. If it is missing or blank, internal endpoints return `503` while public routes still run.
 - Internal routes return `401` when `X-Internal-Token` is missing and `403` when it is present but wrong.
-- Optional embedding generation for `POST /internal/products/{article_id}/embedding` is enabled only when `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` are non-blank. Missing or invalid embedding config does not block startup; that endpoint returns a safe unavailable error instead, except `already_embedded` responses still work without provider config when `force` is not requested. `EMBEDDING_TIMEOUT_SECONDS` defaults to `10` when missing or blank.
+- Optional embedding generation for `POST /internal/products/{article_id}/embedding` is enabled only when `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` are non-blank. `EMBEDDING_BASE_URL` must be the complete HTTPS embeddings endpoint URL ending in `/embeddings`, with no params, query, or fragment. Missing or invalid embedding config does not block startup; that endpoint returns a safe unavailable error instead, except `already_embedded` responses still work without provider config when `force` is not requested. `EMBEDDING_TIMEOUT_SECONDS` defaults to `10` when missing or blank.
 - Dependency management uses `uv` through the local `apps/api/Makefile`.
 
 ## Layout

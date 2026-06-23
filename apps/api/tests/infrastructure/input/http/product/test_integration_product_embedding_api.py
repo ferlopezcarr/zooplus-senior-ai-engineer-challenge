@@ -52,7 +52,9 @@ def _patch_embedding_store(monkeypatch, *, entry):
 
 
 def _patch_embedding_client(monkeypatch, client_class) -> None:
-    monkeypatch.setenv("EMBEDDING_BASE_URL", "https://embeddings.example.test/v1")
+    monkeypatch.setenv(
+        "EMBEDDING_BASE_URL", "https://embeddings.example.test/v1/embeddings"
+    )
     monkeypatch.setenv("EMBEDDING_API_KEY", "super-secret-api-key")
     monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
     monkeypatch.setattr(main, "OpenAICompatibleEmbeddingClient", client_class)
@@ -140,7 +142,7 @@ def test_product_embedding_endpoint_generates_and_persists_missing_embedding(
         ) -> None:
             assert api_key == "super-secret-api-key"
             assert model == "test-embedding-model"
-            assert base_url == "https://embeddings.example.test/v1"
+            assert base_url == "https://embeddings.example.test/v1/embeddings"
             assert timeout_seconds == 10.0
             self.model = model
 
@@ -289,7 +291,9 @@ def test_product_embedding_endpoint_returns_unavailable_for_invalid_base_url(
     monkeypatch,
 ) -> None:
     _patch_embedding_store(monkeypatch, entry=_entry(has_embedding=False))
-    monkeypatch.setenv("EMBEDDING_BASE_URL", "http://embeddings.example.test/v1")
+    monkeypatch.setenv(
+        "EMBEDDING_BASE_URL", "https://embeddings.example.test/v1/embeddings?extra=1"
+    )
     monkeypatch.setenv("EMBEDDING_API_KEY", "super-secret-api-key")
     monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
 
@@ -304,7 +308,9 @@ def test_product_embedding_endpoint_returns_unavailable_for_invalid_timeout(
     monkeypatch,
 ) -> None:
     _patch_embedding_store(monkeypatch, entry=_entry(has_embedding=False))
-    monkeypatch.setenv("EMBEDDING_BASE_URL", "https://embeddings.example.test/v1")
+    monkeypatch.setenv(
+        "EMBEDDING_BASE_URL", "https://embeddings.example.test/v1/embeddings"
+    )
     monkeypatch.setenv("EMBEDDING_API_KEY", "super-secret-api-key")
     monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
     monkeypatch.setenv("EMBEDDING_TIMEOUT_SECONDS", "invalid")
