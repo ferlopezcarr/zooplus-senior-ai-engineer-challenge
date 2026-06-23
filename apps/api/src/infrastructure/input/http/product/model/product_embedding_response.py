@@ -1,13 +1,6 @@
-from typing import Literal
-
 from pydantic import BaseModel
 
-
-ProductEmbeddingStatus = Literal[
-    "already_embedded",
-    "embedded",
-    "recalculated",
-]
+from .product_embedding_status import ProductEmbeddingStatus
 
 
 class ProductEmbeddingResponse(BaseModel):

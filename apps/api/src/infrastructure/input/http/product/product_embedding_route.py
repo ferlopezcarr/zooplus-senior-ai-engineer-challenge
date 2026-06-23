@@ -5,7 +5,7 @@ from secrets import compare_digest
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from src.infrastructure.input.http.products.model import ProductEmbeddingResponse
+from src.infrastructure.input.http.product.model import ProductEmbeddingResponse
 from src.infrastructure.output.model.error import (
     EmbeddingConfigurationError,
     EmbeddingProviderHttpError,

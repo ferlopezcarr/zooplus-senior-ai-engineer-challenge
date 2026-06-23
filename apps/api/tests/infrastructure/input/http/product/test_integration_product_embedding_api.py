@@ -63,7 +63,7 @@ def _build_auth_headers(token: str = INTERNAL_API_TOKEN) -> dict[str, str]:
 
 
 def _entry(*, has_embedding: bool):
-    from src.infrastructure.output.product_embedding_store import ProductEmbeddingEntry
+    from src.infrastructure.output.model import ProductEmbeddingEntry
 
     return ProductEmbeddingEntry(
         article_id=ARTICLE_ID,

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, Column, MetaData, Table, Text, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from src.infrastructure.output.model.product_embedding_entry import (
+    ProductEmbeddingEntry,
+)
 from src.infrastructure.output.model.error import (
     ProductEmbeddingEntryNotFoundError,
     ProductEmbeddingStoreError,
@@ -23,13 +24,6 @@ product_catalog_entries = Table(
     Column("embedding_document", Text, nullable=False),
     Column("embedding", Vector(), nullable=True),
 )
-
-
-@dataclass(frozen=True)
-class ProductEmbeddingEntry:
-    article_id: int
-    embedding_document: str
-    has_embedding: bool
 
 
 class DatabaseProductEmbeddingStore:

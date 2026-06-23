@@ -16,7 +16,7 @@ from src.application.answer_generator import (
 )
 from src.application.use_case.chat_use_case import ChatUseCase
 from src.infrastructure.input.http.chat.chat_route import build_chat_router
-from src.infrastructure.input.http.products.product_embedding_route import (
+from src.infrastructure.input.http.product.product_embedding_route import (
     build_product_embedding_router,
 )
 from src.infrastructure.output.embedding_client import (
