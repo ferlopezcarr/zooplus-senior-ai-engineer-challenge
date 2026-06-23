@@ -5,16 +5,10 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from src.infrastructure.output.model.error import EmbeddingProviderHttpError
+
 
 DEFAULT_EMBEDDING_TIMEOUT_SECONDS = 10.0
-
-
-class EmbeddingConfigurationError(RuntimeError):
-    pass
-
-
-class EmbeddingProviderHttpError(RuntimeError):
-    pass
 
 
 def build_embeddings_url(base_url: str) -> str:

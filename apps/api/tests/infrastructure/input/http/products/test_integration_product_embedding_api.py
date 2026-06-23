@@ -328,7 +328,7 @@ def test_product_embedding_endpoint_returns_404_when_row_disappears_on_save(
             return _entry(has_embedding=False)
 
         def save_embedding(self, article_id: int, embedding: list[float]) -> None:
-            from src.infrastructure.output.product_embedding_store import (
+            from src.infrastructure.output.model.error import (
                 ProductEmbeddingEntryNotFoundError,
             )
 

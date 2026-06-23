@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 import main
 from src.domain.model import Product
 from src.infrastructure.input.http.chat.model import ChatResponse, ProductDTO
+from src.infrastructure.output.model.error import CatalogDatabaseUnavailableError
 from src.infrastructure.output.product_database_retriever import (
-    CatalogDatabaseUnavailableError,
     DatabaseProductRetriever,
 )
 

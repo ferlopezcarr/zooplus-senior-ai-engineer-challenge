@@ -21,10 +21,10 @@ from src.infrastructure.input.http.products.product_embedding_route import (
 )
 from src.infrastructure.output.embedding_client import (
     DEFAULT_EMBEDDING_TIMEOUT_SECONDS,
-    EmbeddingConfigurationError,
     OpenAICompatibleEmbeddingClient,
     build_embeddings_url,
 )
+from src.infrastructure.output.model.error import EmbeddingConfigurationError
 from src.infrastructure.output.llm_answer_client import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     OpenAICompatibleAnswerClient,

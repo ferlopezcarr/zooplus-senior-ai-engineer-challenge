@@ -6,10 +6,10 @@ from urllib.error import HTTPError
 import pytest
 
 from src.infrastructure.output.embedding_client import (
-    EmbeddingProviderHttpError,
     OpenAICompatibleEmbeddingClient,
     build_embeddings_url,
 )
+from src.infrastructure.output.model.error import EmbeddingProviderHttpError
 
 
 def test_build_embeddings_url_rejects_non_https_url() -> None:

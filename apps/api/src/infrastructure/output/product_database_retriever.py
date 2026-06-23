@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import asyncio
 
-from sqlalchemy import BigInteger, Column, Integer, MetaData, Table, Text, or_, select
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Integer,
+    MetaData,
+    Table,
+    Text,
+    or_,
+    select,
+)
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.domain.model import Chat, Product
 from src.domain.service.text_normalizer_service import normalize_query
+from src.infrastructure.output.model.error import CatalogDatabaseUnavailableError
 from src.infrastructure.output.service import to_product
 
 
@@ -126,10 +136,6 @@ class DatabaseProductRetriever:
         return statement.order_by(product_catalog_entries.c.article_id.asc()).limit(
             LEXICAL_CANDIDATE_ROW_LIMIT
         )
-
-
-class CatalogDatabaseUnavailableError(RuntimeError):
-    pass
 
 
 def split_query_terms(query: str) -> set[str]:

@@ -8,9 +8,9 @@ import pytest
 
 from src.application.model.response_context import ResponseContext
 from src.domain.model import Product
+from src.infrastructure.output.model.error import LlmProviderHttpError
 from src.infrastructure.output.llm_answer_client import (
     HTTP_ERROR_BODY_LIMIT,
-    LlmProviderHttpError,
     OpenAICompatibleAnswerClient,
     build_llm_chat_completions_url,
 )

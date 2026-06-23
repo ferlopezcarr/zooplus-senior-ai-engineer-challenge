@@ -1,0 +1,2 @@
+class CatalogDatabaseUnavailableError(RuntimeError):
+    pass

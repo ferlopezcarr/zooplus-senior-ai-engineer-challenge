@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from src.infrastructure.output.model.error import (
+    ProductEmbeddingEntryNotFoundError,
+)
 from src.infrastructure.output.product_embedding_store import (
     DatabaseProductEmbeddingStore,
-    ProductEmbeddingEntryNotFoundError,
 )
 
 

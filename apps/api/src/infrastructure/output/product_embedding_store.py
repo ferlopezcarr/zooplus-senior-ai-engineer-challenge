@@ -8,6 +8,11 @@ from sqlalchemy import BigInteger, Column, MetaData, Table, Text, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from src.infrastructure.output.model.error import (
+    ProductEmbeddingEntryNotFoundError,
+    ProductEmbeddingStoreError,
+)
+
 
 metadata = MetaData()
 
@@ -25,14 +30,6 @@ class ProductEmbeddingEntry:
     article_id: int
     embedding_document: str
     has_embedding: bool
-
-
-class ProductEmbeddingStoreError(RuntimeError):
-    pass
-
-
-class ProductEmbeddingEntryNotFoundError(ProductEmbeddingStoreError):
-    pass
 
 
 class DatabaseProductEmbeddingStore:

@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from src.application.model.response_context import ResponseContext
+from src.infrastructure.output.model.error import LlmProviderHttpError
 
 
 DEFAULT_LLM_TIMEOUT_SECONDS = 10.0
@@ -14,10 +15,6 @@ HTTP_ERROR_BODY_LIMIT = 400
 
 _REDACTED = "[REDACTED]"
 _BEARER_TOKEN_PATTERN = re.compile(r'(?i)\bbearer\s+([^\s,;"\']+)')
-
-
-class LlmProviderHttpError(RuntimeError):
-    pass
 
 
 def build_llm_chat_completions_url(base_url: str) -> str:

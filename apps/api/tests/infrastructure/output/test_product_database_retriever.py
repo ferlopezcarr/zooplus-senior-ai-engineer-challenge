@@ -4,10 +4,10 @@ import pytest
 from sqlalchemy.dialects import postgresql
 
 from src.domain.model import Chat, Query, SiteId
+from src.infrastructure.output.model.error import CatalogDatabaseUnavailableError
 from src.infrastructure.output.product_database_retriever import (
     LEXICAL_CANDIDATE_ROW_LIMIT,
     MAX_SQL_PREFILTER_TERMS,
-    CatalogDatabaseUnavailableError,
     DatabaseProductRetriever,
 )
 

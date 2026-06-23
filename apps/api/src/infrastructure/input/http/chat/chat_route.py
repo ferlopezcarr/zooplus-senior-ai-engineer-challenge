@@ -8,7 +8,7 @@ from src.infrastructure.input.http.chat.service import (
     to_chat_response,
 )
 from src.infrastructure.input.http.chat.model import ChatRequest, ChatResponse
-from src.infrastructure.output.product_database_retriever import (
+from src.infrastructure.output.model.error import (
     CatalogDatabaseUnavailableError,
 )
 

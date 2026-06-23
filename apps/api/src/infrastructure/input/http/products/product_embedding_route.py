@@ -6,14 +6,14 @@ from secrets import compare_digest
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from src.infrastructure.input.http.products.model import ProductEmbeddingResponse
-from src.infrastructure.output.embedding_client import (
+from src.infrastructure.output.model.error import (
     EmbeddingConfigurationError,
     EmbeddingProviderHttpError,
+    ProductEmbeddingEntryNotFoundError,
+    ProductEmbeddingStoreError,
 )
 from src.infrastructure.output.product_embedding_store import (
-    ProductEmbeddingEntryNotFoundError,
     DatabaseProductEmbeddingStore,
-    ProductEmbeddingStoreError,
 )
 
 
