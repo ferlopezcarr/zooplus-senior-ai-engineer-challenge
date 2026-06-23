@@ -37,10 +37,19 @@ def is_off_topic(query: str) -> bool:
 
 def should_suppress_retrieved_products(query: str, products: list[Product]) -> bool:
     normalized_terms = normalize_query(query).split()
-    if len(normalized_terms) == 1:
-        term = normalized_terms[0]
-        return term not in _DOMAIN_TERMS and not any(
-            term in product.search_text.split() for product in products
-        )
+    if _query_matches_product_search_text(normalized_terms, products):
+        return False
 
     return not any(term in _DOMAIN_TERMS for term in normalized_terms)
+
+
+def _query_matches_product_search_text(
+    normalized_terms: list[str], products: list[Product]
+) -> bool:
+    if not normalized_terms:
+        return False
+
+    return any(
+        all(term in product.search_text.split() for term in normalized_terms)
+        for product in products
+    )

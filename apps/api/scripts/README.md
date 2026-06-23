@@ -46,10 +46,9 @@ uv run python scripts/product_catalog_embedding_backfill.py --limit 50
 - The feed collapses duplicate source rows by `article_id` before upsert, so the current dataset loads as 287 unique catalog entries instead of 300 raw rows.
 - The upsert is safe to rerun and preserves existing non-null `embedding` values.
 - `POST /public/chat` requires `PRODUCT_CATALOG_DATABASE_URL` and reads `product_catalog_entries` from PostgreSQL at API startup.
-- The PostgreSQL path used by `POST /public/chat` is still lexical/simple matching.
+- `POST /public/chat` opportunistically uses pgvector matches with similarity `>= 0.3` and falls back to lexical matching when embeddings are missing, sparse, or unavailable.
 - Product embedding generation is available through `POST /internal/products/{article_id}/embedding`.
 - `product_catalog_embedding_backfill.py` is a manual maintenance script. By default it only processes rows where `embedding IS NULL`; pass `--force` to recalculate existing vectors too.
 - The embedding backfill script loads `apps/api/.env` automatically. Every run, including `--dry-run`, requires `PRODUCT_CATALOG_DATABASE_URL` because the script still counts and loads target rows from PostgreSQL before branching. Real runs also require `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL`. `EMBEDDING_BASE_URL` must be the complete HTTPS embeddings endpoint URL.
 - Use `--dry-run` to inspect the current missing backlog plus the selected batch without calling the provider. The dry-run output reports the current missing count unchanged and how many rows would still remain only if the selected batch completed successfully. Use `--limit` to keep local batches small while still seeing the likely backlog after that batch.
 - Every backfill run writes a trace file next to the script: `apps/api/scripts/product_catalog_embedding_YYYYMMDD-HHMMSS.log`. The log includes per-product `article_id`, status, model, short source/embedding hashes, embedding dimensions when available, duration, and failure messages without writing raw source text or full vectors.
-- Vector similarity in `POST /public/chat` remains intentionally deferred.

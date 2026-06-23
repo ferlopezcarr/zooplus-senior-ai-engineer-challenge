@@ -182,6 +182,43 @@ def test_chat_use_case_keeps_retrieved_products_for_brand_only_queries() -> None
     assert "catalog matches" in result.answer.lower()
 
 
+def test_chat_use_case_keeps_retrieved_products_for_multi_word_brand_queries() -> None:
+    product = Product(
+        article_id=3002,
+        product_id="royal-canin-product",
+        variant_id="royal-canin-product-1",
+        title="Digestive Care",
+        summary="complete nutrition",
+        site_id=5,
+        category="dog",
+        score=1.0,
+    )
+
+    class StubRetriever:
+        def retrieve(self, chat: Chat) -> list[Product]:
+            assert chat.query.value == "royal canin"
+            return [
+                Product(
+                    article_id=product.article_id,
+                    product_id=product.product_id,
+                    variant_id=product.variant_id,
+                    title=product.title,
+                    summary=product.summary,
+                    site_id=product.site_id,
+                    category=product.category,
+                    score=product.score,
+                    search_text="royal canin digestive care complete nutrition dog",
+                )
+            ]
+
+    use_case = ChatUseCase(StubRetriever())
+
+    result = use_case.handle(Chat(site_id=SiteId(5), query=Query("royal canin")))
+
+    assert result.retrieved_products == [product]
+    assert "catalog matches" in result.answer.lower()
+
+
 def test_chat_use_case_reports_no_results_without_inventing_products() -> None:
     use_case = ChatUseCase(_stub_retriever([]))
 

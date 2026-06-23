@@ -58,7 +58,7 @@
 
 ## Request Flow
 
-`HTTP request -> FastAPI route -> chat mapper -> chat use case -> PostgreSQL lexical retrieval -> response context -> optional LLM or deterministic answer generation -> chat mapper -> HTTP JSON response`
+`HTTP request -> FastAPI route -> chat mapper -> chat use case -> opportunistic pgvector retrieval (similarity >= 0.3) with lexical top-up/fallback -> response context -> optional LLM or deterministic answer generation -> chat mapper -> HTTP JSON response`
 
 - `ChatUseCase` always retrieves catalog products first.
 - Retrieved products are packaged into `ResponseContext` before answer generation.
@@ -71,11 +71,11 @@
 - Manual local LLM e2e coverage exists via `make test-e2e`, but the default runtime and default test flow do not require LLM credentials.
 - The repository keeps local Docker Compose PostgreSQL + pgvector infrastructure under `infrastructure/local/docker-compose.yml`.
 - Manual persistence commands live under `apps/api` via Alembic and `python scripts/product_catalog_feed.py`; both commands load `apps/api/.env`, use the sync SQLAlchemy PostgreSQL URL form (`postgresql+psycopg://...`), and the feed preserves existing embeddings on rerun.
-- `build_app()` requires `PRODUCT_CATALOG_DATABASE_URL`, selects PostgreSQL lexical retrieval for `/public/chat`, and fails fast when the database readiness check fails.
+- `build_app()` requires `PRODUCT_CATALOG_DATABASE_URL`, wires `/public/chat` for opportunistic pgvector retrieval with a `0.3` similarity threshold plus lexical top-up/fallback, and fails fast when the database readiness check fails.
 - Public product-facing endpoints live under `/public/*`, while `GET /health` stays outside that namespace as the operational root health probe.
 - `/internal/*` always requires `INTERNAL_API_TOKEN`; missing token config makes internal routes unavailable with `503`, missing request headers return `401`, and wrong header values return `403`.
 - Lazy embedding provider config is only required when `POST /internal/products/{article_id}/embedding` generates or recalculates an embedding, while existing embeddings can still return `already_embedded` when `force=false`.
-- `build_app()` does not run Alembic or catalog feed commands at startup, the JSON dataset is feed-only, and `/public/chat` vector similarity remains deferred even though the maintenance endpoint can store embeddings.
+- `build_app()` does not run Alembic or catalog feed commands at startup, the JSON dataset is feed-only, and `/public/chat` uses opportunistic pgvector retrieval with a 0.3 similarity threshold plus lexical top-up/fallback.
 
 ## External API Dependencies
 
@@ -102,7 +102,7 @@ flowchart LR
     Client --> Chat
     Client --> Embedding
 
-    Chat -->|lexical product retrieval| DB
+    Chat -->|pgvector retrieval (>= 0.3) with lexical top-up/fallback| DB
     Chat -. LLM answer with static fallback .-> LLM
 
     Embedding -->|read/update embedding| DB

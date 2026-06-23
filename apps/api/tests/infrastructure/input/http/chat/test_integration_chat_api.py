@@ -256,6 +256,42 @@ def test_chat_endpoint_allows_brand_only_catalog_queries(monkeypatch) -> None:
     ]
 
 
+def test_chat_endpoint_allows_multi_word_brand_catalog_queries(monkeypatch) -> None:
+    _patch_database_retriever(
+        monkeypatch,
+        rows=[
+            {
+                "article_id": 3002,
+                "product_id": "royal-canin-product",
+                "variant_id": "royal-canin-product-1",
+                "product_name": "Digestive Care",
+                "variant_name": "12kg",
+                "summary": "complete nutrition",
+                "description": "adult dog food",
+                "pet_type": "dog",
+                "brands": "Royal Canin",
+                "site_id": 5,
+            }
+        ],
+    )
+    client = TestClient(main.build_app())
+    response = client.post(CHAT_ROUTE, json={"site_id": 5, "query": "royal canin"})
+
+    assert response.status_code == 200
+    assert response.json()["retrieved_products"] == [
+        {
+            "article_id": 3002,
+            "product_id": "royal-canin-product",
+            "variant_id": "royal-canin-product-1",
+            "title": "Digestive Care - 12kg",
+            "summary": "complete nutrition",
+            "site_id": 5,
+            "category": "dog",
+            "score": 2.0,
+        }
+    ]
+
+
 def test_chat_endpoint_uses_database_retriever_when_database_url_is_configured(
     monkeypatch,
 ) -> None:
