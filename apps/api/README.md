@@ -104,6 +104,7 @@ make lint
 - POST `/public/chat` accepts `site_id` and `query`, then returns `answer` and `retrieved_products`.
 - `POST /public/chat` returns `503` with a clear retrieval-unavailable error when the catalog backend fails during request handling.
 - `POST /public/chat` reads `product_catalog_entries` from PostgreSQL only.
+- When embedding provider config is valid and catalog rows already have embeddings, `POST /public/chat` prefers pgvector matches with similarity `>= 0.3` and falls back to lexical matches to cover missing/sparse embeddings or embedding-provider failures.
 - Public product-facing endpoints live under `/public/*`.
 - POST `/internal/products/{article_id}/embedding` is a local maintenance/admin-style endpoint that generates or refreshes one catalog product embedding on demand.
 - In `POST /internal/products/{article_id}/embedding`, `{article_id}` identifies the catalog product entry row.
@@ -115,7 +116,7 @@ make lint
 - `PRODUCT_CATALOG_DATABASE_URL` is required at runtime and must point to a migrated, seeded PostgreSQL database before the API starts.
 - If `PRODUCT_CATALOG_DATABASE_URL` is missing, blank, or points to an unavailable database/table, startup fails fast with a concise configuration error.
 - The JSON dataset remains a static source for `scripts/product_catalog_feed.py`; it is not a runtime retrieval source.
-- Retrieval is still lexical; `/public/chat` vector search remains deferred.
+- `/public/chat` always has lexical retrieval available. When `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` are all valid, it also attempts pgvector matches with similarity `>= 0.3` first and then tops up from lexical matches when needed. Missing, incomplete, invalid, or failing embedding config does not block startup; chat falls back to lexical retrieval.
 - `.env` uses `python-dotenv`; `build_app()` loads `apps/api/.env` at startup with environment variables still taking precedence over file values.
 - Optional LLM answer generation is enabled only when both `LLM_BASE_URL` and `LLM_API_KEY` are non-blank after `.env` loading. If either one is missing, the app logs a one-time startup warning and uses `DeterministicAnswerGenerator`. If `LLM_BASE_URL` is present but invalid, startup fails fast. `LLM_MODEL` still defaults to `gpt-4o-mini`. `LLM_TIMEOUT_SECONDS` defaults to `10` when missing or blank, and must parse as a positive integer or float when LLM mode is enabled. `LLM_API_KEY=replace-me` is treated like any other configured key value.
 - `INTERNAL_API_TOKEN` enables `/internal/*`. If it is missing or blank, internal endpoints return `503` while public routes still run.

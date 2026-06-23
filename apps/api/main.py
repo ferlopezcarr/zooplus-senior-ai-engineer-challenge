@@ -43,6 +43,7 @@ DOTENV_PATH = Path(__file__).resolve().parent / ".env"
 LOGGER = logging.getLogger(__name__)
 
 _missing_llm_config_warnings_emitted: set[str] = set()
+_embedding_retrieval_warnings_emitted: set[str] = set()
 
 
 def build_app() -> FastAPI:
@@ -126,7 +127,10 @@ def _get_required_database_url() -> str:
 
 def _build_product_retriever(database_url: str) -> DatabaseProductRetriever:
 
-    retriever = DatabaseProductRetriever(database_url)
+    retriever = DatabaseProductRetriever(
+        database_url,
+        embedding_client_factory=_build_chat_embedding_client_factory(),
+    )
     readiness_error = retriever.readiness_error()
     if readiness_error:
         LOGGER.warning(
@@ -142,6 +146,49 @@ def _build_product_retriever(database_url: str) -> DatabaseProductRetriever:
         _safe_log_url(database_url),
     )
     return retriever
+
+
+def _build_chat_embedding_client_factory():
+    configured_values = {
+        name: _get_non_blank_env(name)
+        for name in ("EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL")
+    }
+    configured_count = sum(value is not None for value in configured_values.values())
+    if configured_count == 0:
+        return None
+
+    if configured_count != len(configured_values):
+        _warn_embedding_retrieval_once(
+            "incomplete-config",
+            "Incomplete embedding provider config; /public/chat will use lexical fallback.",
+        )
+        return None
+
+    try:
+        build_embeddings_url(configured_values["EMBEDDING_BASE_URL"] or "")
+        _get_timeout_seconds(
+            "EMBEDDING_TIMEOUT_SECONDS",
+            DEFAULT_EMBEDDING_TIMEOUT_SECONDS,
+        )
+    except EmbeddingConfigurationError:
+        _warn_embedding_retrieval_once(
+            "invalid-config",
+            "Invalid embedding provider config; /public/chat will use lexical fallback.",
+        )
+        return None
+    except ValueError:
+        _warn_embedding_retrieval_once(
+            "invalid-config",
+            "Invalid embedding provider config; /public/chat will use lexical fallback.",
+        )
+        return None
+
+    LOGGER.info(
+        "Vector retrieval enabled for /public/chat with model=%s base_url=%s.",
+        configured_values["EMBEDDING_MODEL"],
+        _safe_log_url(configured_values["EMBEDDING_BASE_URL"] or ""),
+    )
+    return _build_embedding_client
 
 
 def _build_embedding_client() -> OpenAICompatibleEmbeddingClient:
@@ -194,6 +241,14 @@ def _warn_missing_llm_config_once(name: str) -> None:
         DOTENV_PATH,
     )
     _missing_llm_config_warnings_emitted.add(name)
+
+
+def _warn_embedding_retrieval_once(key: str, message: str) -> None:
+    if key in _embedding_retrieval_warnings_emitted:
+        return
+
+    LOGGER.warning(message)
+    _embedding_retrieval_warnings_emitted.add(key)
 
 
 def _get_llm_timeout_seconds() -> float:

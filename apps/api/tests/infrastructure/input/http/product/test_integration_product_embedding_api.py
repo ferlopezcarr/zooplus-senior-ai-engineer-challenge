@@ -17,7 +17,11 @@ EMBEDDING_ROUTE = f"/internal/products/{ARTICLE_ID}/embedding"
 
 def _patch_database_retriever(monkeypatch) -> None:
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
             assert database_url == TEST_DATABASE_URL
 
         def readiness_error(self) -> str | None:
@@ -76,6 +80,7 @@ def _entry(*, has_embedding: bool):
 
 def setup_function() -> None:
     main._missing_llm_config_warnings_emitted = set()
+    main._embedding_retrieval_warnings_emitted = set()
 
 
 def _build_test_client(monkeypatch) -> TestClient:

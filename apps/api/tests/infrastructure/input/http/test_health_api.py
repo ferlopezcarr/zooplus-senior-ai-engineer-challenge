@@ -18,13 +18,23 @@ def _clear_llm_env(monkeypatch) -> None:
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.delenv("LLM_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
+    monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("EMBEDDING_TIMEOUT_SECONDS", raising=False)
     monkeypatch.setenv("PRODUCT_CATALOG_DATABASE_URL", TEST_DATABASE_URL)
     monkeypatch.setattr(main, "DOTENV_PATH", Path(".missing-test.env"))
     monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
+    monkeypatch.setattr(main, "_embedding_retrieval_warnings_emitted", set())
 
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
             self.database_url = database_url
+            self.embedding_client_factory = embedding_client_factory
 
         def readiness_error(self) -> str | None:
             return None
@@ -371,8 +381,13 @@ def test_build_app_uses_database_retriever_when_database_url_is_configured(
     captured: dict[str, str] = {}
 
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
             captured["database_url"] = database_url
+            captured["embedding_client_factory"] = embedding_client_factory
 
         def readiness_error(self) -> str | None:
             return None
@@ -402,7 +417,7 @@ def test_build_app_uses_database_retriever_when_database_url_is_configured(
 
 def test_build_app_fails_fast_when_database_retriever_is_not_ready(monkeypatch) -> None:
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(self, database_url: str, embedding_client_factory=None) -> None:
             self.database_url = database_url
 
         def readiness_error(self) -> str | None:
@@ -420,7 +435,7 @@ def test_build_app_fails_fast_when_database_retriever_is_not_ready(monkeypatch) 
 
 def test_build_app_retrieval_startup_error_stays_concise(monkeypatch) -> None:
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(self, database_url: str, embedding_client_factory=None) -> None:
             self.database_url = database_url
 
         def readiness_error(self) -> str | None:
@@ -444,7 +459,7 @@ def test_build_app_does_not_log_raw_retrieval_startup_error(
     monkeypatch, caplog
 ) -> None:
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(self, database_url: str, embedding_client_factory=None) -> None:
             self.database_url = database_url
 
         def readiness_error(self) -> str | None:

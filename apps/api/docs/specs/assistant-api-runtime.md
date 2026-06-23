@@ -23,8 +23,8 @@ Record the current HTTP contract exposed by `apps/api`.
 - Invalid `POST /public/chat` payloads return a validation error, including blank or overlong queries.
 - Retrieval backend failures return `503` with a clear runtime error instead of an opaque `500`.
 - `PRODUCT_CATALOG_DATABASE_URL` is required, and startup fails fast before serving requests when it is missing, blank, or the retrieval database is not ready.
-- Embedding provider configuration is optional at startup; missing or invalid embedding config only makes `POST /internal/products/{article_id}/embedding` unavailable at request time.
+- Embedding provider configuration is optional at startup; missing, incomplete, or invalid embedding config does not block `/public/chat` and instead leaves it on lexical retrieval while `POST /internal/products/{article_id}/embedding` stays unavailable at request time.
 
 ## Documentation Rule
 
-- API-local docs must describe the current runtime: PostgreSQL-backed lexical retrieval for `/public/chat`, required manual Alembic/feed preparation, and no startup migration/feed side effects.
+- API-local docs must describe the current runtime: PostgreSQL-backed `/public/chat` retrieval with opportunistic pgvector similarity plus lexical fallback, required manual Alembic/feed preparation, and no startup migration/feed side effects.

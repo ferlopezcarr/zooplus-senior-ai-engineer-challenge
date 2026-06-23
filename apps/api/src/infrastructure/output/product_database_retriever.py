@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
+
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Column,
@@ -22,6 +26,9 @@ from src.infrastructure.output.service import to_product
 PRODUCT_CATALOG_DATABASE_URL_ENV = "PRODUCT_CATALOG_DATABASE_URL"
 LEXICAL_CANDIDATE_ROW_LIMIT = 200
 MAX_SQL_PREFILTER_TERMS = 6
+VECTOR_CANDIDATE_ROW_LIMIT = 6
+MINIMUM_VECTOR_SIMILARITY = 0.3
+MAXIMUM_VECTOR_DISTANCE = 1.0 - MINIMUM_VECTOR_SIMILARITY
 PRODUCT_SEARCHABLE_FIELDS = (
     "product_name",
     "variant_name",
@@ -32,6 +39,8 @@ PRODUCT_SEARCHABLE_FIELDS = (
 )
 SINGLE_TERM_MINIMUM_MATCH_SCORE = 1
 MULTI_TERM_MINIMUM_MATCH_SCORE = 2
+
+LOGGER = logging.getLogger(__name__)
 
 metadata = MetaData()
 
@@ -48,12 +57,18 @@ product_catalog_entries = Table(
     Column("variant_name", Text, nullable=False),
     Column("summary", Text, nullable=False),
     Column("description", Text, nullable=False),
+    Column("embedding", Vector(), nullable=True),
 )
 
 
 class DatabaseProductRetriever:
-    def __init__(self, database_url: str) -> None:
+    def __init__(
+        self,
+        database_url: str,
+        embedding_client_factory: Callable[[], object] | None = None,
+    ) -> None:
         self._database_url = database_url
+        self._embedding_client_factory = embedding_client_factory
 
     def readiness_error(self) -> str | None:
         try:
@@ -67,6 +82,10 @@ class DatabaseProductRetriever:
         if not query_terms:
             return []
 
+        vector_products = self._retrieve_vector_products(chat, limit=limit)
+        if len(vector_products) >= limit:
+            return vector_products
+
         try:
             rows = self._load_rows_for_site(chat.site_id.value, query_terms)
         except (RuntimeError, SQLAlchemyError, OSError, ValueError) as exc:
@@ -77,10 +96,20 @@ class DatabaseProductRetriever:
         ranked_rows = rank_rows_by_query_terms(
             rows, query_terms=query_terms, limit=limit
         )
-        return [
+        lexical_products = [
             to_product(row, chat.site_id.value, float(score))
             for score, row in ranked_rows
         ]
+        if not vector_products:
+            return lexical_products
+
+        seen_article_ids = {product.article_id for product in vector_products}
+        lexical_top_up = [
+            product
+            for product in lexical_products
+            if product.article_id not in seen_article_ids
+        ]
+        return (vector_products + lexical_top_up)[:limit]
 
     def _validate_database(self) -> None:
         engine = create_engine(self._database_url)
@@ -99,6 +128,50 @@ class DatabaseProductRetriever:
     ) -> list[dict[str, object]]:
         engine = create_engine(self._database_url)
         statement = self._build_candidate_statement(site_id, query_terms)
+
+        try:
+            with engine.connect() as connection:
+                result = connection.execute(statement)
+                return [dict(row) for row in result.mappings()]
+        finally:
+            engine.dispose()
+
+    def _retrieve_vector_products(self, chat: Chat, *, limit: int) -> list[Product]:
+        if self._embedding_client_factory is None:
+            return []
+
+        try:
+            client = self._embedding_client_factory()
+            embedding = client.embed(chat.query.value)
+            rows = self._load_vector_rows_for_site(
+                chat.site_id.value,
+                embedding,
+                limit=limit,
+            )
+        except Exception as exc:
+            LOGGER.warning(
+                "Vector retrieval failed; using lexical fallback. error=%s",
+                exc,
+            )
+            return []
+
+        vector_products: list[Product] = []
+        for row in rows:
+            similarity = _vector_similarity_from_distance(float(row["distance"]))
+            if similarity < MINIMUM_VECTOR_SIMILARITY:
+                continue
+            vector_products.append(to_product(row, chat.site_id.value, similarity))
+        return vector_products
+
+    def _load_vector_rows_for_site(
+        self,
+        site_id: int,
+        embedding: list[float],
+        *,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        engine = create_engine(self._database_url)
+        statement = self._build_vector_statement(site_id, embedding, limit=limit)
 
         try:
             with engine.connect() as connection:
@@ -131,6 +204,35 @@ class DatabaseProductRetriever:
 
         return statement.order_by(product_catalog_entries.c.article_id.asc()).limit(
             LEXICAL_CANDIDATE_ROW_LIMIT
+        )
+
+    def _build_vector_statement(
+        self,
+        site_id: int,
+        embedding: list[float],
+        *,
+        limit: int,
+    ):
+        distance = product_catalog_entries.c.embedding.cosine_distance(embedding)
+        return (
+            select(
+                product_catalog_entries.c.article_id,
+                product_catalog_entries.c.product_id,
+                product_catalog_entries.c.variant_id,
+                product_catalog_entries.c.site_id,
+                product_catalog_entries.c.pet_type,
+                product_catalog_entries.c.brands,
+                product_catalog_entries.c.product_name,
+                product_catalog_entries.c.variant_name,
+                product_catalog_entries.c.summary,
+                product_catalog_entries.c.description,
+                distance.label("distance"),
+            )
+            .where(product_catalog_entries.c.site_id == site_id)
+            .where(product_catalog_entries.c.embedding.is_not(None))
+            .where(distance <= MAXIMUM_VECTOR_DISTANCE)
+            .order_by(distance.asc(), product_catalog_entries.c.article_id.asc())
+            .limit(min(limit, VECTOR_CANDIDATE_ROW_LIMIT))
         )
 
 
@@ -189,3 +291,7 @@ def _row_title(row: dict[str, object]) -> str:
     product_name = str(row.get("product_name", ""))
     variant_name = str(row.get("variant_name", ""))
     return f"{product_name} - {variant_name}"
+
+
+def _vector_similarity_from_distance(distance: float) -> float:
+    return max(0.0, 1.0 - distance)

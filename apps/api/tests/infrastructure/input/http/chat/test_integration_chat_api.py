@@ -38,12 +38,21 @@ def _patch_database_retriever(
     monkeypatch,
     *,
     rows: list[dict[str, object]] | None = None,
+    vector_rows: list[dict[str, object]] | None = None,
     retrieval_error: Exception | None = None,
 ) -> None:
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
             assert database_url == TEST_DATABASE_URL
-            self._delegate = DatabaseProductRetriever(database_url)
+            self._delegate = DatabaseProductRetriever(
+                database_url,
+                embedding_client_factory=embedding_client_factory,
+            )
+            self._embedding_client_factory = embedding_client_factory
 
             def _load_rows_for_site(
                 site_id: int,
@@ -59,6 +68,23 @@ def _patch_database_retriever(
                 ]
 
             self._delegate._load_rows_for_site = _load_rows_for_site  # type: ignore[method-assign]
+
+            def _load_vector_rows_for_site(
+                site_id: int,
+                embedding: list[float],
+                *,
+                limit: int,
+            ) -> list[dict[str, object]]:
+                del embedding
+                return [
+                    row
+                    for row in (vector_rows or [])[:limit]
+                    if isinstance(row["site_id"], int)
+                    and not isinstance(row["site_id"], bool)
+                    and row["site_id"] == site_id
+                ]
+
+            self._delegate._load_vector_rows_for_site = _load_vector_rows_for_site  # type: ignore[method-assign]
 
         def readiness_error(self) -> str | None:
             return None
@@ -77,9 +103,14 @@ def _clear_llm_env(monkeypatch) -> None:
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.delenv("LLM_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
+    monkeypatch.delenv("EMBEDDING_MODEL", raising=False)
+    monkeypatch.delenv("EMBEDDING_TIMEOUT_SECONDS", raising=False)
     monkeypatch.setenv("PRODUCT_CATALOG_DATABASE_URL", TEST_DATABASE_URL)
     monkeypatch.setattr(main, "DOTENV_PATH", Path(".missing-test.env"))
     monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
+    monkeypatch.setattr(main, "_embedding_retrieval_warnings_emitted", set())
     _patch_database_retriever(monkeypatch, rows=ENV_ONLY_ROWS)
 
 
@@ -142,8 +173,13 @@ def test_chat_endpoint_uses_database_retriever_when_database_url_is_configured(
     monkeypatch,
 ) -> None:
     class StubDatabaseProductRetriever:
-        def __init__(self, database_url: str) -> None:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
             assert database_url == TEST_DATABASE_URL
+            assert embedding_client_factory is None
 
         def readiness_error(self) -> str | None:
             return None
@@ -183,6 +219,222 @@ def test_chat_endpoint_uses_database_retriever_when_database_url_is_configured(
             "score": 2.0,
         }
     ]
+
+
+def test_chat_endpoint_enables_vector_retrieval_when_embedding_config_is_complete(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubDatabaseProductRetriever:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
+            assert database_url == TEST_DATABASE_URL
+            captured["factory"] = embedding_client_factory
+
+        def readiness_error(self) -> str | None:
+            return None
+
+        def retrieve(self, chat, limit: int = 3) -> list[Product]:
+            return []
+
+    class StubEmbeddingClient:
+        model = "test-embedding-model"
+
+        def __init__(self, **kwargs) -> None:
+            captured["embedding_kwargs"] = kwargs
+
+        def embed(self, text: str) -> list[float]:
+            return [0.1, 0.2]
+
+    monkeypatch.setenv(
+        "EMBEDDING_BASE_URL", "https://embeddings.example.test/v1/embeddings"
+    )
+    monkeypatch.setenv("EMBEDDING_API_KEY", "secret")
+    monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "OpenAICompatibleEmbeddingClient", StubEmbeddingClient)
+
+    main.build_app()
+
+    factory = captured["factory"]
+    assert callable(factory)
+    client = factory()
+    assert isinstance(client, StubEmbeddingClient)
+    assert captured["embedding_kwargs"] == {
+        "api_key": "secret",
+        "model": "test-embedding-model",
+        "base_url": "https://embeddings.example.test/v1/embeddings",
+        "timeout_seconds": 10.0,
+    }
+
+
+def test_chat_endpoint_uses_lexical_top_up_after_dropping_below_threshold_vector_hits(
+    monkeypatch,
+) -> None:
+    class StubEmbeddingClient:
+        def __init__(self, **kwargs) -> None:
+            del kwargs
+
+        def embed(self, text: str) -> list[float]:
+            assert text == "dog ball"
+            return [0.1, 0.2]
+
+    _patch_database_retriever(
+        monkeypatch,
+        rows=[
+            {
+                "article_id": 9001,
+                "product_id": "lexical-alpha",
+                "variant_id": "lexical-alpha-1",
+                "product_name": "Alpha Ball",
+                "variant_name": "Fetch Toy",
+                "summary": "dog ball for fetch",
+                "description": "exact lexical match",
+                "pet_type": "dog",
+                "brands": "Alpha",
+                "site_id": 1,
+            },
+            {
+                "article_id": 9002,
+                "product_id": "lexical-beta",
+                "variant_id": "lexical-beta-1",
+                "product_name": "Beta Ball",
+                "variant_name": "Dog Toy",
+                "summary": "dog ball for play",
+                "description": "second lexical match",
+                "pet_type": "dog",
+                "brands": "Beta",
+                "site_id": 1,
+            },
+        ],
+        vector_rows=[
+            {
+                "article_id": 8001,
+                "product_id": "vector-kept",
+                "variant_id": "vector-kept-1",
+                "product_name": "Vector Match",
+                "variant_name": "Toy",
+                "summary": "semantic dog ball match",
+                "description": "kept at threshold",
+                "pet_type": "dog",
+                "brands": "Vector",
+                "site_id": 1,
+                "distance": 0.7,
+            },
+            {
+                "article_id": 8002,
+                "product_id": "vector-dropped",
+                "variant_id": "vector-dropped-1",
+                "product_name": "Vector Noise",
+                "variant_name": "Toy",
+                "summary": "irrelevant semantic miss",
+                "description": "below threshold",
+                "pet_type": "dog",
+                "brands": "Vector",
+                "site_id": 1,
+                "distance": 0.71,
+            },
+        ],
+    )
+    monkeypatch.setenv(
+        "EMBEDDING_BASE_URL", "https://embeddings.example.test/v1/embeddings"
+    )
+    monkeypatch.setenv("EMBEDDING_API_KEY", "secret")
+    monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
+    monkeypatch.setattr(main, "OpenAICompatibleEmbeddingClient", StubEmbeddingClient)
+
+    client = TestClient(main.build_app())
+    response = client.post(CHAT_ROUTE, json={"site_id": 1, "query": "dog ball"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    retrieved_products = payload["retrieved_products"]
+
+    assert payload == {
+        "answer": (
+            "For site 1, I found these catalog matches: "
+            "Vector Match - Toy (dog): semantic dog ball match; "
+            "Alpha Ball - Fetch Toy (dog): dog ball for fetch; "
+            "Beta Ball - Dog Toy (dog): dog ball for play."
+        ),
+        "retrieved_products": [
+            retrieved_products[0],
+            {
+                "article_id": 9001,
+                "product_id": "lexical-alpha",
+                "variant_id": "lexical-alpha-1",
+                "title": "Alpha Ball - Fetch Toy",
+                "summary": "dog ball for fetch",
+                "site_id": 1,
+                "category": "dog",
+                "score": 2.0,
+            },
+            {
+                "article_id": 9002,
+                "product_id": "lexical-beta",
+                "variant_id": "lexical-beta-1",
+                "title": "Beta Ball - Dog Toy",
+                "summary": "dog ball for play",
+                "site_id": 1,
+                "category": "dog",
+                "score": 2.0,
+            },
+        ],
+    }
+    assert {
+        key: value for key, value in retrieved_products[0].items() if key != "score"
+    } == {
+        "article_id": 8001,
+        "product_id": "vector-kept",
+        "variant_id": "vector-kept-1",
+        "title": "Vector Match - Toy",
+        "summary": "semantic dog ball match",
+        "site_id": 1,
+        "category": "dog",
+    }
+    assert retrieved_products[0]["score"] >= 0.3
+
+
+def test_chat_endpoint_disables_vector_retrieval_when_embedding_config_is_invalid(
+    monkeypatch,
+    caplog,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class StubDatabaseProductRetriever:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
+            assert database_url == TEST_DATABASE_URL
+            captured["factory"] = embedding_client_factory
+
+        def readiness_error(self) -> str | None:
+            return None
+
+        def retrieve(self, chat, limit: int = 3) -> list[Product]:
+            return []
+
+    monkeypatch.setenv(
+        "EMBEDDING_BASE_URL", "https://embeddings.example.test/v1/embeddings?extra=1"
+    )
+    monkeypatch.setenv("EMBEDDING_API_KEY", "secret")
+    monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    caplog.set_level("WARNING")
+
+    main.build_app()
+
+    assert captured["factory"] is None
+    assert (
+        "Invalid embedding provider config; /public/chat will use lexical fallback."
+        in [record.getMessage() for record in caplog.records]
+    )
 
 
 @pytest.mark.parametrize("database_url", ["", "   "])
