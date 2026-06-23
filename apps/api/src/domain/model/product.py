@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -13,3 +13,4 @@ class Product:
     site_id: int
     category: str
     score: float
+    search_text: str = field(default="", compare=False, repr=False)

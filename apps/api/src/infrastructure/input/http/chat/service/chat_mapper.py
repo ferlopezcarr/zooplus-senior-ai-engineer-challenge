@@ -22,4 +22,13 @@ def to_chat_response(result: ChatResult) -> ChatResponse:
 
 
 def to_product_dto(product: Product) -> ProductDTO:
-    return ProductDTO(**product.__dict__)
+    return ProductDTO(
+        article_id=product.article_id,
+        product_id=product.product_id,
+        variant_id=product.variant_id,
+        title=product.title,
+        summary=product.summary,
+        site_id=product.site_id,
+        category=product.category,
+        score=product.score,
+    )

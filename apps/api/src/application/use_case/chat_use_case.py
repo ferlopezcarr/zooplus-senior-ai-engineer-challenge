@@ -5,7 +5,10 @@ from src.application.answer_generator import (
     DeterministicAnswerGenerator,
 )
 from src.application.model.response_context import ResponseContext
-from src.application.service.off_topic_query_policy import is_off_topic
+from src.application.service.off_topic_query_policy import (
+    is_off_topic,
+    should_suppress_retrieved_products,
+)
 from src.domain.model import Chat, ChatResult
 from src.infrastructure.output.product_retrieval_port import ProductRetrievalPort
 
@@ -21,6 +24,12 @@ class ChatUseCase:
 
     def handle(self, chat: Chat) -> ChatResult:
         products = self._retriever.retrieve(chat)
+        if products and should_suppress_retrieved_products(chat.query.value, products):
+            return ChatResult(
+                answer=self._answer_generator.off_topic(),
+                retrieved_products=[],
+            )
+
         if products:
             context = ResponseContext(products=products)
             return ChatResult(

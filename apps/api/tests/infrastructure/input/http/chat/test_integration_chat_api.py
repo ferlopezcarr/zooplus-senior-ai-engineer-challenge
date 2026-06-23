@@ -133,6 +133,93 @@ def test_chat_endpoint_returns_postgresql_backed_products() -> None:
     ]
 
 
+def test_chat_endpoint_hides_products_for_off_topic_queries(monkeypatch) -> None:
+    class StubDatabaseProductRetriever:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
+            assert database_url == TEST_DATABASE_URL
+            del embedding_client_factory
+
+        def readiness_error(self) -> str | None:
+            return None
+
+        def retrieve(self, chat, limit: int = 3) -> list[Product]:
+            assert chat.query.value == "what is the weather today"
+            assert limit == 3
+            return [
+                Product(
+                    article_id=2001,
+                    product_id="env-only-product",
+                    variant_id="env-only-product-1",
+                    title="Env Only Ball - Dog Toy",
+                    summary="ball for dog fetch",
+                    site_id=77,
+                    category="dog",
+                    score=2.0,
+                )
+            ]
+
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+
+    client = TestClient(main.build_app())
+    response = client.post(
+        CHAT_ROUTE,
+        json={"site_id": 77, "query": "what is the weather today"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "I can only help with pet products that exist in the provided catalog.",
+        "retrieved_products": [],
+    }
+
+
+def test_chat_endpoint_hides_products_for_single_word_off_topic_queries(
+    monkeypatch,
+) -> None:
+    class StubDatabaseProductRetriever:
+        def __init__(
+            self,
+            database_url: str,
+            embedding_client_factory=None,
+        ) -> None:
+            assert database_url == TEST_DATABASE_URL
+            del embedding_client_factory
+
+        def readiness_error(self) -> str | None:
+            return None
+
+        def retrieve(self, chat, limit: int = 3) -> list[Product]:
+            assert chat.query.value == "bitcoin"
+            assert limit == 3
+            return [
+                Product(
+                    article_id=2001,
+                    product_id="env-only-product",
+                    variant_id="env-only-product-1",
+                    title="Env Only Ball - Dog Toy",
+                    summary="ball for dog fetch",
+                    site_id=77,
+                    category="dog",
+                    score=2.0,
+                )
+            ]
+
+    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+
+    client = TestClient(main.build_app())
+    response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "bitcoin"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "I can only help with pet products that exist in the provided catalog.",
+        "retrieved_products": [],
+    }
+
+
 def test_chat_endpoint_allows_brand_only_catalog_queries(monkeypatch) -> None:
     _patch_database_retriever(
         monkeypatch,

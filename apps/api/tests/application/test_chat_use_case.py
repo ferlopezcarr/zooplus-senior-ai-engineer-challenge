@@ -90,6 +90,98 @@ def test_chat_use_case_refuses_off_topic_queries() -> None:
     assert "pet products" in result.answer.lower()
 
 
+def test_chat_use_case_hides_retrieved_products_for_off_topic_queries() -> None:
+    class SpyRetriever:
+        def retrieve(self, chat: Chat) -> list[Product]:
+            assert chat.query.value == "what is the weather today"
+            return [
+                Product(
+                    article_id=5511354,
+                    product_id="dog-ball",
+                    variant_id="759837.1",
+                    title="Env Only Ball - Dog Toy",
+                    summary="ball for dog fetch",
+                    site_id=77,
+                    category="dog",
+                    score=2.0,
+                )
+            ]
+
+    retriever = SpyRetriever()
+    use_case = ChatUseCase(retriever)
+
+    result = use_case.handle(
+        Chat(site_id=SiteId(1), query=Query("what is the weather today"))
+    )
+
+    assert result.retrieved_products == []
+    assert "pet products" in result.answer.lower()
+
+
+def test_chat_use_case_hides_retrieved_products_for_single_word_off_topic_queries() -> (
+    None
+):
+    class SpyRetriever:
+        def retrieve(self, chat: Chat) -> list[Product]:
+            assert chat.query.value == "bitcoin"
+            return [
+                Product(
+                    article_id=5511354,
+                    product_id="dog-ball",
+                    variant_id="759837.1",
+                    title="Env Only Ball - Dog Toy",
+                    summary="ball for dog fetch",
+                    site_id=77,
+                    category="dog",
+                    score=2.0,
+                )
+            ]
+
+    use_case = ChatUseCase(SpyRetriever())
+
+    result = use_case.handle(Chat(site_id=SiteId(1), query=Query("bitcoin")))
+
+    assert result.retrieved_products == []
+    assert "pet products" in result.answer.lower()
+
+
+def test_chat_use_case_keeps_retrieved_products_for_brand_only_queries() -> None:
+    product = Product(
+        article_id=3001,
+        product_id="brand-only-product",
+        variant_id="brand-only-product-1",
+        title="Sensitive Dry Food",
+        summary="complete nutrition",
+        site_id=5,
+        category="dog",
+        score=1.0,
+    )
+
+    class StubRetriever:
+        def retrieve(self, chat: Chat) -> list[Product]:
+            assert chat.query.value == "eukanuba"
+            return [
+                Product(
+                    article_id=product.article_id,
+                    product_id=product.product_id,
+                    variant_id=product.variant_id,
+                    title=product.title,
+                    summary=product.summary,
+                    site_id=product.site_id,
+                    category=product.category,
+                    score=product.score,
+                    search_text="eukanuba sensitive dry food complete nutrition dog",
+                )
+            ]
+
+    use_case = ChatUseCase(StubRetriever())
+
+    result = use_case.handle(Chat(site_id=SiteId(5), query=Query("eukanuba")))
+
+    assert result.retrieved_products == [product]
+    assert "catalog matches" in result.answer.lower()
+
+
 def test_chat_use_case_reports_no_results_without_inventing_products() -> None:
     use_case = ChatUseCase(_stub_retriever([]))
 
