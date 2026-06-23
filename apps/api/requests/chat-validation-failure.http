@@ -1,7 +1,0 @@
-POST http://127.0.0.1:8000/public/chat
-Content-Type: application/json
-
-{
-  "site_id": 1,
-  "query": "   "
-}

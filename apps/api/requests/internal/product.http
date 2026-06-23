@@ -1,0 +1,9 @@
+# Product
+
+### Product embedding
+POST http://127.0.0.1:8000/internal/products/5511354/embedding
+X-Internal-Token: local-internal-token
+
+### Product embedding Force recalculation
+POST http://127.0.0.1:8000/internal/products/5511354/embedding?force=true
+X-Internal-Token: local-internal-token

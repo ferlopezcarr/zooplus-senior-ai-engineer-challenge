@@ -1,0 +1,20 @@
+# Chat
+
+### Chat success
+POST http://127.0.0.1:8000/public/chat
+Content-Type: application/json
+
+{
+  "site_id": 1,
+  "query": "dog ball fetch"
+}
+
+
+### Chat validation failure
+POST http://127.0.0.1:8000/public/chat
+Content-Type: application/json
+
+{
+  "site_id": 1,
+  "query": "   "
+}
