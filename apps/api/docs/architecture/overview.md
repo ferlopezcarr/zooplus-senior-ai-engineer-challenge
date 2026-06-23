@@ -77,6 +77,38 @@
 - Lazy embedding provider config is only required when `POST /internal/products/{article_id}/embedding` generates or recalculates an embedding, while existing embeddings can still return `already_embedded` when `force=false`.
 - `build_app()` does not run Alembic or catalog feed commands at startup, the JSON dataset is feed-only, and `/public/chat` vector similarity remains deferred even though the maintenance endpoint can store embeddings.
 
+## External API Dependencies
+
+The static product dataset JSON is a feed input for `scripts/product_catalog_feed.py`. It is not a runtime dependency of `GET /health` or `POST /public/chat`.
+
+### Endpoint and Resource View
+
+```mermaid
+flowchart LR
+    Client[Client / API Consumer]
+
+    subgraph API[apps/api - FastAPI]
+        Health[GET /health]
+        Chat[POST /public/chat]
+        Embedding["POST /internal/products/{article_id}/embedding"]
+    end
+
+    DB[(PostgreSQL + pgvector)]
+
+    LLM[OpenAI-compatible LLM Provider<br/>Gemini via LLM_BASE_URL]
+    EmbeddingProvider[OpenAI-compatible Embedding Provider<br/>via EMBEDDING_BASE_URL]
+
+    Client --> Health
+    Client --> Chat
+    Client --> Embedding
+
+    Chat -->|lexical product retrieval| DB
+    Chat -. LLM answer with static fallback .-> LLM
+
+    Embedding -->|read/update embedding| DB
+    Embedding --> EmbeddingProvider
+```
+
 ## Deployable Boundary
 
 - This document describes only `apps/api`.
