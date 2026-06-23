@@ -18,3 +18,23 @@ Content-Type: application/json
   "site_id": 1,
   "query": "   "
 }
+
+
+### Chat searchable-terms validation failure
+POST http://127.0.0.1:8000/public/chat
+Content-Type: application/json
+
+{
+  "site_id": 1,
+  "query": "!!! &amp; ???"
+}
+
+
+### Chat off-topic guardrail
+POST http://127.0.0.1:8000/public/chat
+Content-Type: application/json
+
+{
+  "site_id": 1,
+  "query": "what is the weather today"
+}

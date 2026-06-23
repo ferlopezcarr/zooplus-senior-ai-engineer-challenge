@@ -56,6 +56,25 @@
 | `POST /public/chat` | Implemented | Validates `site_id` and `query`, retrieves grounded catalog evidence from PostgreSQL, and returns a grounded JSON response or retrieval-unavailable failure. |
 | `POST /internal/products/{article_id}/embedding` | Implemented | Internal maintenance route protected at the `/internal` router level, returning `already_embedded` without provider config when an embedding exists and `force=false`, and otherwise creating or refreshing one stored product embedding with lazy provider config. |
 
+## Endpoint and Resource View
+
+```mermaid
+flowchart LR
+    Health[GET /health] --> Process[API process]
+
+    Chat[POST /public/chat] --> Catalog[(PostgreSQL catalog<br/>product_catalog_entries)]
+    Chat --> LLM{LLM configured?}
+    LLM -->|Yes| AnswerProvider[Optional LLM answer provider]
+    LLM -->|No| Deterministic[Deterministic grounded answer]
+
+    Embed["POST /internal/products/{article_id}/embedding"] --> Catalog
+    Embed --> Embeddings[Embedding provider]
+```
+
+- `GET /health` is process-only and does not depend on PostgreSQL or external providers.
+- `POST /public/chat` always depends on the PostgreSQL catalog and uses the LLM path only when runtime config enables it.
+- `POST /internal/products/{article_id}/embedding` depends on the PostgreSQL catalog plus the embedding provider when it needs to create or refresh an embedding.
+
 ## Request Flow
 
 `HTTP request -> FastAPI route -> chat mapper -> chat use case -> opportunistic pgvector retrieval (similarity >= 0.3) with lexical top-up/fallback -> response context -> optional LLM or deterministic answer generation -> chat mapper -> HTTP JSON response`
@@ -81,32 +100,21 @@
 
 The static product dataset JSON is a feed input for `scripts/product_catalog_feed.py`. It is not a runtime dependency of `GET /health` or `POST /public/chat`.
 
-### Endpoint and Resource View
+### `/public/chat` Retrieval Flow
 
 ```mermaid
 flowchart LR
-    Client[Client / API Consumer]
-
-    subgraph API[apps/api - FastAPI]
-        Health[GET /health]
-        Chat[POST /public/chat]
-        Embedding["POST /internal/products/{article_id}/embedding"]
-    end
-
-    DB[(PostgreSQL + pgvector)]
-
-    LLM[OpenAI-compatible LLM Provider<br/>Gemini via LLM_BASE_URL]
-    EmbeddingProvider[OpenAI-compatible Embedding Provider<br/>via EMBEDDING_BASE_URL]
-
-    Client --> Health
-    Client --> Chat
-    Client --> Embedding
-
-    Chat -->|pgvector retrieval (>= 0.3) with lexical top-up/fallback| DB
-    Chat -. LLM answer with static fallback .-> LLM
-
-    Embedding -->|read/update embedding| DB
-    Embedding --> EmbeddingProvider
+    Request[POST /public/chat] --> Retrieval[Site-scoped retrieval starts]
+    Retrieval --> Embedding{Embedding path available?}
+    Embedding -->|Yes| Vector[pgvector retrieval<br/>similarity >= 0.3]
+    Embedding -->|No| Lexical[Lexical retrieval]
+    Vector --> TopUp[Lexical top-up / fallback]
+    Lexical --> Guardrail{Suppress<br/>retrieved_products?}
+    TopUp --> Guardrail
+    Guardrail -->|Yes| Hidden["retrieved_products = []"]
+    Guardrail -->|No| Visible[Grounded retrieved_products]
+    Hidden --> Response[JSON response]
+    Visible --> Response
 ```
 
 ## Deployable Boundary
@@ -120,5 +128,3 @@ flowchart LR
 - Use `../../../../README.md` for repository-level orientation.
 - Use `../specs/assistant-api-runtime.md` for the current HTTP contract.
 - Use `../specs/dataset-grounded-retrieval.md` for the current retrieval boundary.
-- Use `./first-delivery.md` for the historical first milestone snapshot.
-- Use `./second-delivery.md` for the second delivery delta.

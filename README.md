@@ -32,11 +32,9 @@ Monorepo-style repository for a product-grounded assistant PoC. The current depl
 
 ## Quick Start
 
-```bash
-cd apps/api
-make install
-make run
-```
+1. Start local PostgreSQL/pgvector with [`infrastructure/local/README.md`](infrastructure/local/README.md).
+2. Follow [`apps/api/README.md`](apps/api/README.md) for API env setup, catalog preparation, and local startup.
+3. Use the API-local specs under `apps/api/docs/specs/` for the current runtime contract.
 
 ## Optional local Git pre-commit hook
 

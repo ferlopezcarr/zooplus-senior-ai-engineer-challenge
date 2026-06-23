@@ -12,6 +12,7 @@ Record the current retrieval boundary for `apps/api`.
 - Query normalization lives in `src/domain/service/text_normalizer_service.py`; row mapping stays under `src/infrastructure/output/service/`.
 - `POST /public/chat` attempts retrieval before applying the off-topic fallback so valid catalog-only brand queries can succeed.
 - Off-topic and no-result requests still return polite answers without invented products.
+- Off-topic requests must return `retrieved_products: []` even when lexical matching found catalog rows, unless the normalized query terms directly match the retrieved product search text (for example, valid brand-only catalog queries).
 - `PRODUCT_CATALOG_DATABASE_URL` is required at startup and must be non-blank.
 - Startup fails fast if the database connection or `product_catalog_entries` table is not ready.
 - Startup does not run Alembic or `scripts/product_catalog_feed.py`; database preparation remains manual.
@@ -22,3 +23,4 @@ Record the current retrieval boundary for `apps/api`.
 ## Durable Boundary
 
 - Retrieval remains site-scoped. `/public/chat` now uses pgvector similarity opportunistically and falls back to lexical matching instead of making embeddings a startup dependency.
+- Off-topic suppression is part of the `/public/chat` response contract: the API may reuse retrieval internally to classify a query, but it must not expose unrelated catalog evidence in `retrieved_products`.
