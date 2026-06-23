@@ -8,7 +8,7 @@ import main
 
 
 TEST_DATABASE_URL = (
-    "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+    "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
 )
 ARTICLE_ID = 5511354
 INTERNAL_API_TOKEN = "internal-maintenance-token"

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 from sqlalchemy import (
     BigInteger,
     Column,
@@ -12,8 +10,8 @@ from sqlalchemy import (
     or_,
     select,
 )
+from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.domain.model import Chat, Product
 from src.domain.service.text_normalizer_service import normalize_query
@@ -59,7 +57,7 @@ class DatabaseProductRetriever:
 
     def readiness_error(self) -> str | None:
         try:
-            asyncio.run(self._validate_database())
+            self._validate_database()
         except (RuntimeError, SQLAlchemyError, OSError, ValueError) as exc:
             return str(exc)
         return None
@@ -70,9 +68,7 @@ class DatabaseProductRetriever:
             return []
 
         try:
-            rows = asyncio.run(
-                self._load_rows_for_site(chat.site_id.value, query_terms)
-            )
+            rows = self._load_rows_for_site(chat.site_id.value, query_terms)
         except (RuntimeError, SQLAlchemyError, OSError, ValueError) as exc:
             raise CatalogDatabaseUnavailableError(
                 "Catalog retrieval is unavailable."
@@ -86,30 +82,30 @@ class DatabaseProductRetriever:
             for score, row in ranked_rows
         ]
 
-    async def _validate_database(self) -> None:
-        engine = create_async_engine(self._database_url)
+    def _validate_database(self) -> None:
+        engine = create_engine(self._database_url)
         try:
-            async with engine.connect() as connection:
-                await connection.execute(
+            with engine.connect() as connection:
+                connection.execute(
                     select(product_catalog_entries.c.article_id).limit(1)
                 )
         finally:
-            await engine.dispose()
+            engine.dispose()
 
-    async def _load_rows_for_site(
+    def _load_rows_for_site(
         self,
         site_id: int,
         query_terms: set[str],
     ) -> list[dict[str, object]]:
-        engine = create_async_engine(self._database_url)
+        engine = create_engine(self._database_url)
         statement = self._build_candidate_statement(site_id, query_terms)
 
         try:
-            async with engine.connect() as connection:
-                result = await connection.execute(statement)
+            with engine.connect() as connection:
+                result = connection.execute(statement)
                 return [dict(row) for row in result.mappings()]
         finally:
-            await engine.dispose()
+            engine.dispose()
 
     def _build_candidate_statement(self, site_id: int, query_terms: set[str]):
         statement = select(

@@ -16,10 +16,10 @@ def test_database_product_retriever_orders_results_by_lexical_score(
     monkeypatch,
 ) -> None:
     retriever = DatabaseProductRetriever(
-        "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
-    async def _load_rows_for_site(
+    def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
     ) -> list[dict[str, object]]:
@@ -74,10 +74,10 @@ def test_database_product_retriever_orders_results_by_lexical_score(
 
 def test_database_product_retriever_wraps_database_failures(monkeypatch) -> None:
     retriever = DatabaseProductRetriever(
-        "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
-    async def _load_rows_for_site(
+    def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
     ) -> list[dict[str, object]]:
@@ -94,9 +94,37 @@ def test_database_product_retriever_wraps_database_failures(monkeypatch) -> None
         retriever.retrieve(Chat(site_id=SiteId(1), query=Query("dog food")))
 
 
+def test_readiness_error_returns_none_when_validation_succeeds(monkeypatch) -> None:
+    retriever = DatabaseProductRetriever(
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
+    )
+    captured: dict[str, bool] = {"validated": False}
+
+    def _validate_database() -> None:
+        captured["validated"] = True
+
+    monkeypatch.setattr(retriever, "_validate_database", _validate_database)
+
+    assert retriever.readiness_error() is None
+    assert captured["validated"] is True
+
+
+def test_readiness_error_returns_validation_failure(monkeypatch) -> None:
+    retriever = DatabaseProductRetriever(
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
+    )
+
+    def _validate_database() -> None:
+        raise ValueError("invalid catalog credentials")
+
+    monkeypatch.setattr(retriever, "_validate_database", _validate_database)
+
+    assert retriever.readiness_error() == "invalid catalog credentials"
+
+
 def test_database_product_retriever_bounds_sql_candidates() -> None:
     retriever = DatabaseProductRetriever(
-        "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
     statement = retriever._build_candidate_statement(1, {"dog", "ball"})
@@ -112,7 +140,7 @@ def test_database_product_retriever_bounds_sql_candidates() -> None:
 
 def test_database_product_retriever_caps_sql_prefilter_terms() -> None:
     retriever = DatabaseProductRetriever(
-        "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
     query_terms = {

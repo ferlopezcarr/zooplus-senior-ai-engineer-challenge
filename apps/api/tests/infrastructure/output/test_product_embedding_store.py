@@ -12,10 +12,10 @@ from src.infrastructure.output.product_embedding_store import (
 
 def test_save_embedding_preserves_not_found_error(monkeypatch) -> None:
     store = DatabaseProductEmbeddingStore(
-        "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
-    async def _raise_not_found(article_id: int, embedding: list[float]) -> None:
+    def _raise_not_found(article_id: int, embedding: list[float]) -> None:
         assert article_id == 5511354
         assert embedding == [0.1, 0.2]
         raise ProductEmbeddingEntryNotFoundError("Product not found.")

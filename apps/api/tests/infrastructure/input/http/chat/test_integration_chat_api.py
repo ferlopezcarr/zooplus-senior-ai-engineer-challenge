@@ -15,7 +15,7 @@ from src.infrastructure.output.product_database_retriever import (
 
 
 TEST_DATABASE_URL = (
-    "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+    "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
 )
 CHAT_ROUTE = "/public/chat"
 ENV_ONLY_ROWS = [
@@ -45,7 +45,7 @@ def _patch_database_retriever(
             assert database_url == TEST_DATABASE_URL
             self._delegate = DatabaseProductRetriever(database_url)
 
-            async def _load_rows_for_site(
+            def _load_rows_for_site(
                 site_id: int,
                 query_terms: set[str],
             ) -> list[dict[str, object]]:

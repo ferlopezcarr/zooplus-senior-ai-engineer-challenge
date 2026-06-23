@@ -20,7 +20,7 @@ Prefer the local `.env` workflow so Alembic and the feed script use the same val
 Example local-only value:
 
 ```dotenv
-PRODUCT_CATALOG_DATABASE_URL=postgresql+asyncpg://<user>:<password>@example.test:5432/catalog
+PRODUCT_CATALOG_DATABASE_URL=postgresql+psycopg://<user>:<password>@example.test:5432/catalog
 ```
 
 One-time setup from `apps/api`:

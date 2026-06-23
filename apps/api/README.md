@@ -53,7 +53,29 @@ curl -X POST http://127.0.0.1:8000/public/chat \
 - If `LLM_BASE_URL` is present but invalid, startup fails fast with a configuration error.
 - If both are present, the app keeps the current OpenAI-compatible LLM path.
 
-## Manual LLM e2e tests
+## Manual runtime e2e tests
+
+Prerequisites:
+
+1. Start local PostgreSQL from `infrastructure/local`:
+
+```bash
+cp .env.example .env
+docker compose up -d
+docker compose ps
+```
+
+2. Copy `apps/api/.env.example` to `apps/api/.env` if needed, then set `PRODUCT_CATALOG_DATABASE_URL` to your local PostgreSQL connection string.
+3. Prepare the runtime catalog from `apps/api`:
+
+```bash
+uv run alembic upgrade head
+uv run python scripts/product_catalog_feed.py
+```
+
+4. Optional provider paths:
+   - Set `LLM_BASE_URL` + `LLM_API_KEY` to verify provider-backed `/public/chat` answers.
+   - Set `INTERNAL_API_TOKEN` + `EMBEDDING_BASE_URL` + `EMBEDDING_API_KEY` + `EMBEDDING_MODEL` to verify `POST /internal/products/{article_id}/embedding`.
 
 Run from `apps/api`:
 
@@ -62,7 +84,9 @@ make test-e2e
 ```
 
 - The tests use `TestClient(build_app())`, so no external server is needed.
-- They load the same local `.env` path as the app runtime and skip cleanly when `LLM_BASE_URL` or `LLM_API_KEY` is missing or blank.
+- They cover `GET /health` plus the real PostgreSQL-backed `/public/chat` path.
+- The LLM and embedding checks are optional and skip cleanly when their env vars are missing.
+- If `PRODUCT_CATALOG_DATABASE_URL` is missing or the catalog DB is not ready, the suite skips with a message telling you to run Alembic and the feed first.
 - `make test`, CI, and the tracked pre-commit flow stay on the default suite because `e2e` tests are excluded there.
 
 ## Lint

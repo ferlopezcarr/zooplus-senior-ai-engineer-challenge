@@ -26,10 +26,10 @@ def _stub_retriever(products: list[Product]):
 
 def _database_retriever(rows: list[dict[str, object]]) -> DatabaseProductRetriever:
     retriever = DatabaseProductRetriever(
-        "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
-    async def _load_rows_for_site(
+    def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
     ) -> list[dict[str, object]]:

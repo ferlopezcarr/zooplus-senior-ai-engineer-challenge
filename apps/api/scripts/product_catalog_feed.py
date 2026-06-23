@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import sys
 from os import getenv
@@ -11,9 +10,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, Column, Integer, MetaData, Table, Text
+from sqlalchemy import BigInteger, Column, Integer, MetaData, Table, Text, create_engine
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION, insert
-from sqlalchemy.ext.asyncio import create_async_engine
 
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
@@ -172,14 +170,14 @@ def merge_pet_types(existing_value: str, incoming_value: str) -> str:
     return " / ".join(pet_types)
 
 
-async def upsert_catalog_rows(rows: list[dict[str, object]]) -> int:
-    engine = create_async_engine(get_product_catalog_database_url())
+def upsert_catalog_rows(rows: list[dict[str, object]]) -> int:
+    engine = create_engine(get_product_catalog_database_url())
     upsert_statement = build_catalog_upsert_statement(rows)
 
-    async with engine.begin() as connection:
-        await connection.execute(upsert_statement)
+    with engine.begin() as connection:
+        connection.execute(upsert_statement)
 
-    await engine.dispose()
+    engine.dispose()
     return len(rows)
 
 
@@ -222,7 +220,7 @@ def main() -> None:
         )
         return
 
-    inserted_rows = asyncio.run(upsert_catalog_rows(rows))
+    inserted_rows = upsert_catalog_rows(rows)
     print(f"Upserted {inserted_rows} product rows into PostgreSQL.")
 
 

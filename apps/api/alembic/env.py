@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-import asyncio
 from os import getenv
 from pathlib import Path
 
 from alembic import context
 from dotenv import load_dotenv
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, Column, Integer, MetaData, Table, Text
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Integer,
+    MetaData,
+    Table,
+    Text,
+    engine_from_config,
+)
 from sqlalchemy import pool
 from sqlalchemy.dialects.postgresql import DOUBLE_PRECISION
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 
 config = context.config
@@ -81,20 +87,20 @@ def do_run_migrations(connection) -> None:
         context.run_migrations()
 
 
-async def run_migrations_online() -> None:
-    connectable = async_engine_from_config(
+def run_migrations_online() -> None:
+    connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
 
-    await connectable.dispose()
+    connectable.dispose()
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    run_migrations_online()

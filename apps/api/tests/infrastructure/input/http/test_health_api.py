@@ -8,7 +8,7 @@ import main
 
 
 TEST_DATABASE_URL = (
-    "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
+    "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
 )
 
 
@@ -199,7 +199,7 @@ def test_build_app_logs_when_llm_generator_is_enabled(monkeypatch, caplog) -> No
         for record in caplog.records
         if record.levelno == logging.INFO and record.name == main.__name__
     ] == [
-        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+asyncpg://example.test:5432/catalog.",
+        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+psycopg://example.test:5432/catalog.",
         "LLM answer generation enabled with model=test-model base_url=https://example.test/v1.",
     ]
 
@@ -269,7 +269,7 @@ def test_build_app_logs_llm_base_url_without_userinfo(monkeypatch, caplog) -> No
         for record in caplog.records
         if record.levelno == logging.INFO and record.name == main.__name__
     ] == [
-        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+asyncpg://example.test:5432/catalog.",
+        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+psycopg://example.test:5432/catalog.",
         "LLM answer generation enabled with model=test-model base_url=https://example.test/v1.",
     ]
 
@@ -396,7 +396,7 @@ def test_build_app_uses_database_retriever_when_database_url_is_configured(
         for record in caplog.records
         if record.levelno == logging.INFO and record.name == main.__name__
     ] == [
-        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+asyncpg://example.test:5432/catalog."
+        "Catalog retrieval enabled from PostgreSQL database_url=postgresql+psycopg://example.test:5432/catalog."
     ]
 
 
@@ -463,7 +463,7 @@ def test_build_app_does_not_log_raw_retrieval_startup_error(
     assert [record.getMessage() for record in caplog.records] == [
         (
             "Catalog retrieval startup check failed for "
-            "database_url=postgresql+asyncpg://example.test:5432/catalog."
+            "database_url=postgresql+psycopg://example.test:5432/catalog."
         )
     ]
 
