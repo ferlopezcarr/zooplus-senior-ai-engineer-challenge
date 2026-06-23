@@ -5,7 +5,7 @@ from src.application.answer_generator import (
     DeterministicAnswerGenerator,
 )
 from src.application.model.response_context import ResponseContext
-from src.application.service.topic_service import is_off_topic
+from src.application.service.off_topic_query_policy import is_off_topic
 from src.domain.model import Chat, ChatResult
 from src.infrastructure.output.product_retrieval_port import ProductRetrievalPort
 
