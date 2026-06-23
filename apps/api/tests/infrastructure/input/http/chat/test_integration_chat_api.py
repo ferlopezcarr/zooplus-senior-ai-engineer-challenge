@@ -17,6 +17,7 @@ from src.infrastructure.output.product_database_retriever import (
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
 )
+CHAT_ROUTE = "/public/chat"
 ENV_ONLY_ROWS = [
     {
         "article_id": 2001,
@@ -84,7 +85,7 @@ def _clear_llm_env(monkeypatch) -> None:
 
 def test_chat_endpoint_returns_postgresql_backed_products() -> None:
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 200
     assert response.json()["retrieved_products"] == [
@@ -120,7 +121,7 @@ def test_chat_endpoint_allows_brand_only_catalog_queries(monkeypatch) -> None:
         ],
     )
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 5, "query": "eukanuba"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 5, "query": "eukanuba"})
 
     assert response.status_code == 200
     assert response.json()["retrieved_products"] == [
@@ -167,7 +168,7 @@ def test_chat_endpoint_uses_database_retriever_when_database_url_is_configured(
     monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
 
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 200
     assert response.json()["retrieved_products"] == [
@@ -205,7 +206,7 @@ def test_chat_endpoint_uses_generic_retrieval_wording_when_database_fails(
     )
 
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 503
     assert response.json() == {"detail": "Catalog retrieval is unavailable."}
@@ -238,7 +239,7 @@ def test_chat_endpoint_uses_llm_answer_when_configured(monkeypatch) -> None:
     monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", StubAnswerClient)
 
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 200
     body = response.json()
@@ -273,7 +274,7 @@ def test_chat_endpoint_falls_back_when_llm_call_fails(monkeypatch) -> None:
     monkeypatch.setattr(main, "OpenAICompatibleAnswerClient", FailingAnswerClient)
 
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 77, "query": "env ball"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "env ball"})
 
     assert response.status_code == 200
     assert response.json() == {
@@ -352,7 +353,7 @@ def test_chat_endpoint_returns_products_in_score_order(monkeypatch) -> None:
     )
 
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 1, "query": "dog ball fetch"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 1, "query": "dog ball fetch"})
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/json")
@@ -430,7 +431,7 @@ def test_chat_endpoint_ignores_boolean_site_rows(monkeypatch) -> None:
     )
 
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 1, "query": "dog ball fetch"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 1, "query": "dog ball fetch"})
 
     assert response.status_code == 200
     assert response.json()["retrieved_products"] == [
@@ -450,28 +451,32 @@ def test_chat_endpoint_ignores_boolean_site_rows(monkeypatch) -> None:
 def test_chat_endpoint_rejects_invalid_requests() -> None:
     client = TestClient(main.build_app())
 
-    missing_site_response = client.post("/chat", json={"query": "dog food"})
+    missing_site_response = client.post(CHAT_ROUTE, json={"query": "dog food"})
     boolean_site_response = client.post(
-        "/chat", json={"site_id": True, "query": "dog food"}
+        CHAT_ROUTE, json={"site_id": True, "query": "dog food"}
     )
     float_site_response = client.post(
-        "/chat", json={"site_id": 1.0, "query": "dog food"}
+        CHAT_ROUTE, json={"site_id": 1.0, "query": "dog food"}
     )
     string_site_response = client.post(
-        "/chat", json={"site_id": "1", "query": "dog food"}
+        CHAT_ROUTE, json={"site_id": "1", "query": "dog food"}
     )
     zero_padded_string_site_response = client.post(
-        "/chat", json={"site_id": "01", "query": "dog food"}
+        CHAT_ROUTE, json={"site_id": "01", "query": "dog food"}
     )
-    zero_site_response = client.post("/chat", json={"site_id": 0, "query": "dog food"})
+    zero_site_response = client.post(
+        CHAT_ROUTE, json={"site_id": 0, "query": "dog food"}
+    )
     negative_site_response = client.post(
-        "/chat", json={"site_id": -1, "query": "dog food"}
+        CHAT_ROUTE, json={"site_id": -1, "query": "dog food"}
     )
-    empty_query_response = client.post("/chat", json={"site_id": 1, "query": "   "})
+    empty_query_response = client.post(CHAT_ROUTE, json={"site_id": 1, "query": "   "})
     semantic_query_response = client.post(
-        "/chat", json={"site_id": 1, "query": "!!! &amp; ???"}
+        CHAT_ROUTE, json={"site_id": 1, "query": "!!! &amp; ???"}
     )
-    long_query_response = client.post("/chat", json={"site_id": 1, "query": "a" * 501})
+    long_query_response = client.post(
+        CHAT_ROUTE, json={"site_id": 1, "query": "a" * 501}
+    )
 
     assert missing_site_response.status_code == 422
     assert boolean_site_response.status_code == 422
@@ -489,7 +494,7 @@ def test_chat_endpoint_rejects_malformed_json_requests() -> None:
     client = TestClient(main.build_app())
 
     response = client.post(
-        "/chat",
+        CHAT_ROUTE,
         content='{"site_id": 1,',
         headers={"Content-Type": "application/json"},
     )
@@ -529,7 +534,7 @@ def test_chat_endpoint_normalizes_html_summary_in_answer_and_retrieved_products(
     )
 
     client = TestClient(main.build_app())
-    response = client.post("/chat", json={"site_id": 1, "query": "omega dogs"})
+    response = client.post(CHAT_ROUTE, json={"site_id": 1, "query": "omega dogs"})
 
     assert response.status_code == 200
     assert response.json() == {

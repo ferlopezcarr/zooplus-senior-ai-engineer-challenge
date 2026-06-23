@@ -16,10 +16,22 @@ from src.application.answer_generator import (
 )
 from src.application.use_case.chat_use_case import ChatUseCase
 from src.infrastructure.input.http.chat.chat_route import build_chat_router
+from src.infrastructure.input.http.products.product_embedding_route import (
+    build_product_embedding_router,
+)
+from src.infrastructure.output.embedding_client import (
+    DEFAULT_EMBEDDING_TIMEOUT_SECONDS,
+    EmbeddingConfigurationError,
+    OpenAICompatibleEmbeddingClient,
+    build_embeddings_url,
+)
 from src.infrastructure.output.llm_answer_client import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     OpenAICompatibleAnswerClient,
     build_llm_chat_completions_url,
+)
+from src.infrastructure.output.product_embedding_store import (
+    DatabaseProductEmbeddingStore,
 )
 from src.infrastructure.output.product_database_retriever import (
     PRODUCT_CATALOG_DATABASE_URL_ENV,
@@ -41,10 +53,11 @@ def build_app() -> FastAPI:
     app = FastAPI(
         title="Zooplus Assistant API",
         version="0.1.0",
-        description="FastAPI service exposing grounded catalog chat and health endpoints.",
+        description="FastAPI service exposing operational health, public grounded catalog chat, and internal product embedding maintenance endpoints.",
     )
 
-    retriever = _build_product_retriever()
+    database_url = _get_required_database_url()
+    retriever = _build_product_retriever(database_url)
 
     @app.get("/")
     async def root() -> Mapping[str, str]:
@@ -60,6 +73,14 @@ def build_app() -> FastAPI:
 
     use_case = ChatUseCase(retriever, answer_generator=_build_answer_generator())
     app.include_router(build_chat_router(use_case))
+    app.include_router(
+        build_product_embedding_router(
+            database_url=database_url,
+            internal_api_token=_get_non_blank_env("INTERNAL_API_TOKEN"),
+            embedding_client_factory=_build_embedding_client,
+            embedding_store_factory=DatabaseProductEmbeddingStore,
+        )
+    )
 
     return app
 
@@ -93,12 +114,17 @@ def _build_answer_generator() -> AnswerGenerator:
     return LlmAnswerGenerator(client)
 
 
-def _build_product_retriever() -> DatabaseProductRetriever:
+def _get_required_database_url() -> str:
     database_url = _get_non_blank_env(PRODUCT_CATALOG_DATABASE_URL_ENV)
     if not database_url:
         raise ValueError(
             f"{PRODUCT_CATALOG_DATABASE_URL_ENV} must be set to a non-blank PostgreSQL connection string for runtime product retrieval."
         )
+
+    return database_url
+
+
+def _build_product_retriever(database_url: str) -> DatabaseProductRetriever:
 
     retriever = DatabaseProductRetriever(database_url)
     readiness_error = retriever.readiness_error()
@@ -116,6 +142,34 @@ def _build_product_retriever() -> DatabaseProductRetriever:
         _safe_log_url(database_url),
     )
     return retriever
+
+
+def _build_embedding_client() -> OpenAICompatibleEmbeddingClient:
+    base_url = _get_non_blank_env("EMBEDDING_BASE_URL")
+    api_key = _get_non_blank_env("EMBEDDING_API_KEY")
+    model = _get_non_blank_env("EMBEDDING_MODEL")
+
+    if not base_url or not api_key or not model:
+        raise EmbeddingConfigurationError("Embedding generation is unavailable.")
+
+    try:
+        build_embeddings_url(base_url)
+        timeout_seconds = _get_timeout_seconds(
+            "EMBEDDING_TIMEOUT_SECONDS",
+            DEFAULT_EMBEDDING_TIMEOUT_SECONDS,
+        )
+    except ValueError as exc:
+        raise EmbeddingConfigurationError(
+            "Embedding generation is unavailable."
+        ) from exc
+
+    client = OpenAICompatibleEmbeddingClient(
+        api_key=api_key,
+        model=model,
+        base_url=base_url,
+        timeout_seconds=timeout_seconds,
+    )
+    return client
 
 
 def _get_non_blank_env(name: str) -> str | None:
@@ -143,17 +197,21 @@ def _warn_missing_llm_config_once(name: str) -> None:
 
 
 def _get_llm_timeout_seconds() -> float:
-    value = getenv("LLM_TIMEOUT_SECONDS")
+    return _get_timeout_seconds("LLM_TIMEOUT_SECONDS", DEFAULT_LLM_TIMEOUT_SECONDS)
+
+
+def _get_timeout_seconds(name: str, default: float) -> float:
+    value = getenv(name)
     if value is None or not value.strip():
-        return DEFAULT_LLM_TIMEOUT_SECONDS
+        return default
 
     try:
         timeout_seconds = float(value)
     except ValueError as exc:
-        raise ValueError("LLM_TIMEOUT_SECONDS must be a positive number") from exc
+        raise ValueError(f"{name} must be a positive number") from exc
 
     if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
-        raise ValueError("LLM_TIMEOUT_SECONDS must be a positive number")
+        raise ValueError(f"{name} must be a positive number")
 
     return timeout_seconds
 

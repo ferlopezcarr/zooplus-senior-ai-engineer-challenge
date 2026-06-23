@@ -25,7 +25,7 @@ make run
 
 - Python `>=3.14,<3.15` is required by `pyproject.toml`.
 - `make install` syncs runtime, test, and lint dependencies into the local uv-managed virtualenv.
-- Before `make run`, manually run Alembic plus `scripts/product_catalog_feed.py` so PostgreSQL is migrated and seeded for `/chat`.
+- Before `make run`, manually run Alembic plus `scripts/product_catalog_feed.py` so PostgreSQL is migrated and seeded for `/public/chat`.
 - `make run` starts the API on `http://127.0.0.1:8000`.
 
 ## Test
@@ -44,7 +44,7 @@ make test
 4. In another terminal, call:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/chat \
+curl -X POST http://127.0.0.1:8000/public/chat \
   -H 'Content-Type: application/json' \
   -d '{"site_id": 1, "query": "dog food"}'
 ```
@@ -74,19 +74,27 @@ make lint
 ## Current Routes
 
 - GET `/` returns service status metadata.
-- GET `/health` returns process/liveness status only.
-- POST `/chat` accepts `site_id` and `query`, then returns `answer` and `retrieved_products`.
-- `POST /chat` returns `503` with a clear retrieval-unavailable error when the catalog backend fails during request handling.
-- `POST /chat` reads `product_catalog_entries` from PostgreSQL only.
+- GET `/health` returns process/liveness status only and remains the operational root health endpoint.
+- POST `/public/chat` accepts `site_id` and `query`, then returns `answer` and `retrieved_products`.
+- `POST /public/chat` returns `503` with a clear retrieval-unavailable error when the catalog backend fails during request handling.
+- `POST /public/chat` reads `product_catalog_entries` from PostgreSQL only.
+- Public product-facing endpoints live under `/public/*`.
+- POST `/internal/products/{article_id}/embedding` is a local maintenance/admin-style endpoint that generates or refreshes one catalog product embedding on demand.
+- In `POST /internal/products/{article_id}/embedding`, `{article_id}` identifies the catalog product entry row.
+- Everything under `/internal/*` requires `X-Internal-Token` to match `INTERNAL_API_TOKEN`.
+- Internal maintenance endpoints live under `/internal/*`.
 
 ## Configuration
 
 - `PRODUCT_CATALOG_DATABASE_URL` is required at runtime and must point to a migrated, seeded PostgreSQL database before the API starts.
 - If `PRODUCT_CATALOG_DATABASE_URL` is missing, blank, or points to an unavailable database/table, startup fails fast with a concise configuration error.
 - The JSON dataset remains a static source for `scripts/product_catalog_feed.py`; it is not a runtime retrieval source.
-- Retrieval is still lexical; embeddings/vector search remain deferred.
+- Retrieval is still lexical; `/public/chat` vector search remains deferred.
 - `.env` uses `python-dotenv`; `build_app()` loads `apps/api/.env` at startup with environment variables still taking precedence over file values.
 - Optional LLM answer generation is enabled only when both `LLM_BASE_URL` and `LLM_API_KEY` are non-blank after `.env` loading. If either one is missing, the app logs a one-time startup warning and uses `DeterministicAnswerGenerator`. If `LLM_BASE_URL` is present but invalid, startup fails fast. `LLM_MODEL` still defaults to `gpt-4o-mini`. `LLM_TIMEOUT_SECONDS` defaults to `10` when missing or blank, and must parse as a positive integer or float when LLM mode is enabled. `LLM_API_KEY=replace-me` is treated like any other configured key value.
+- `INTERNAL_API_TOKEN` enables `/internal/*`. If it is missing or blank, internal endpoints return `503` while public routes still run.
+- Internal routes return `401` when `X-Internal-Token` is missing and `403` when it is present but wrong.
+- Optional embedding generation for `POST /internal/products/{article_id}/embedding` is enabled only when `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` are non-blank. Missing or invalid embedding config does not block startup; that endpoint returns a safe unavailable error instead, except `already_embedded` responses still work without provider config when `force` is not requested. `EMBEDDING_TIMEOUT_SECONDS` defaults to `10` when missing or blank.
 - Dependency management uses `uv` through the local `apps/api/Makefile`.
 
 ## Layout
@@ -95,6 +103,6 @@ make lint
 - `src/domain` defines chat request/result value objects.
 - `src/domain/service/text_normalizer_service.py` owns shared query normalization.
 - `src/application` contains the chat use case.
-- `src/infrastructure/input/http` exposes the FastAPI `POST /chat` adapter.
-- `src/infrastructure/output` contains retrieval adapters and row-to-domain mapping.
+- `src/infrastructure/input/http` exposes the FastAPI `POST /public/chat` and `POST /internal/products/{article_id}/embedding` adapters, while `main.py` keeps root-level operational routes such as `GET /health`.
+- `src/infrastructure/output` contains retrieval adapters, the embedding client/store, and row-to-domain mapping.
 - `tests/` contains focused unit and integration coverage for the current runtime.

@@ -16,6 +16,7 @@ _DETERMINISTIC_PREFIX = "For site "
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://test_user:test_password@example.test:5432/catalog"
 )
+CHAT_ROUTE = "/public/chat"
 CATALOG_ROWS = [
     {
         "article_id": 1001,
@@ -126,7 +127,7 @@ def test_chat_uses_real_llm_for_english_grounded_query(
     client = _build_client(monkeypatch)
 
     response = client.post(
-        "/chat",
+        CHAT_ROUTE,
         json={"site_id": 1, "query": "dog food for sensitive stomach"},
     )
 
@@ -140,7 +141,7 @@ def test_chat_uses_real_llm_for_spanish_grounded_query(
     client = _build_client(monkeypatch)
 
     response = client.post(
-        "/chat",
+        CHAT_ROUTE,
         json={"site_id": 1, "query": "pienso para perro sensible"},
     )
 

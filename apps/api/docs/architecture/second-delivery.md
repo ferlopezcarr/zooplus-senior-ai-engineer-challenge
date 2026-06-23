@@ -1,6 +1,6 @@
 # Second Delivery Overview
 
-> Historical snapshot: this document records the second delivery milestone delta and is kept for historical context. For current-state behavior, use `overview.md` and the API specs.
+> Historical snapshot: this document records the second delivery milestone delta and is kept for historical context. Route names in this file reflect that milestone date and may differ from the current `/public/*` and `/internal/*` API surface. For current-state behavior, use `overview.md` and the API specs.
 
 This document records the second delivery delta for the `apps/api` PoC. It captures that milestone's runtime additions without rewriting the first delivery snapshot.
 

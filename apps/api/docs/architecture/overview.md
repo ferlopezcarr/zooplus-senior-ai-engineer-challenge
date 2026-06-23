@@ -17,7 +17,7 @@
 ## Runtime Shape
 
 - `main.py` exposes `build_app()` and the runtime starts through `uvicorn main:build_app --factory`.
-- The current route surface exposes service metadata, health, and grounded chat.
+- The current route surface exposes service metadata, a root operational health endpoint, public product-facing routes, and internal embedding maintenance routes.
 - `src/` reserves hexagonal package boundaries for domain, application, and infrastructure code.
 
 ## Package Boundaries
@@ -52,8 +52,9 @@
 | Route | Status | Purpose |
 | --- | --- | --- |
 | `GET /` | Implemented | Returns service status metadata. |
-| `GET /health` | Implemented | Returns process/liveness status only. |
-| `POST /chat` | Implemented | Validates `site_id` and `query`, retrieves grounded catalog evidence from PostgreSQL, and returns a grounded JSON response or retrieval-unavailable failure. |
+| `GET /health` | Implemented | Returns process/liveness status only as the operational root health endpoint. |
+| `POST /public/chat` | Implemented | Validates `site_id` and `query`, retrieves grounded catalog evidence from PostgreSQL, and returns a grounded JSON response or retrieval-unavailable failure. |
+| `POST /internal/products/{article_id}/embedding` | Implemented | Internal maintenance route protected at the `/internal` router level, returning `already_embedded` without provider config when an embedding exists and `force=false`, and otherwise creating or refreshing one stored product embedding with lazy provider config. |
 
 ## Request Flow
 
@@ -70,8 +71,11 @@
 - Manual local LLM e2e coverage exists via `make test-e2e`, but the default runtime and default test flow do not require LLM credentials.
 - The repository keeps local Docker Compose PostgreSQL + pgvector infrastructure under `infrastructure/local/docker-compose.yml`.
 - Manual persistence commands live under `apps/api` via Alembic and `python scripts/product_catalog_feed.py`; both commands load `apps/api/.env`, and the feed preserves existing embeddings on rerun.
-- `build_app()` requires `PRODUCT_CATALOG_DATABASE_URL`, selects PostgreSQL lexical retrieval for `/chat`, and fails fast when the database readiness check fails.
-- `build_app()` does not run Alembic or catalog feed commands at startup, the JSON dataset is feed-only, and embeddings/vector similarity remain deferred.
+- `build_app()` requires `PRODUCT_CATALOG_DATABASE_URL`, selects PostgreSQL lexical retrieval for `/public/chat`, and fails fast when the database readiness check fails.
+- Public product-facing endpoints live under `/public/*`, while `GET /health` stays outside that namespace as the operational root health probe.
+- `/internal/*` always requires `INTERNAL_API_TOKEN`; missing token config makes internal routes unavailable with `503`, missing request headers return `401`, and wrong header values return `403`.
+- Lazy embedding provider config is only required when `POST /internal/products/{article_id}/embedding` generates or recalculates an embedding, while existing embeddings can still return `already_embedded` when `force=false`.
+- `build_app()` does not run Alembic or catalog feed commands at startup, the JSON dataset is feed-only, and `/public/chat` vector similarity remains deferred even though the maintenance endpoint can store embeddings.
 
 ## Deployable Boundary
 

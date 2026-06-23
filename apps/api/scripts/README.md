@@ -2,7 +2,7 @@
 
 ## Product catalog feed
 
-`product_catalog_feed.py` loads the static product catalog dataset into PostgreSQL for the runtime `/chat` retrieval path.
+`product_catalog_feed.py` loads the static product catalog dataset into PostgreSQL for the runtime `/public/chat` retrieval path.
 
 ### Prerequisites
 
@@ -43,5 +43,7 @@ uv run python scripts/product_catalog_feed.py
 - `--dry-run` validates and maps the dataset without opening a database connection.
 - The feed collapses duplicate source rows by `article_id` before upsert, so the current dataset loads as 287 unique catalog entries instead of 300 raw rows.
 - The upsert is safe to rerun and preserves existing non-null `embedding` values.
-- `POST /chat` requires `PRODUCT_CATALOG_DATABASE_URL` and reads `product_catalog_entries` from PostgreSQL at API startup.
-- The PostgreSQL path is still lexical/simple matching. Embeddings and vector similarity are intentionally deferred.
+- `POST /public/chat` requires `PRODUCT_CATALOG_DATABASE_URL` and reads `product_catalog_entries` from PostgreSQL at API startup.
+- The PostgreSQL path used by `POST /public/chat` is still lexical/simple matching.
+- Product embedding generation is available through `POST /internal/products/{article_id}/embedding`.
+- Vector similarity in `POST /public/chat` remains intentionally deferred.

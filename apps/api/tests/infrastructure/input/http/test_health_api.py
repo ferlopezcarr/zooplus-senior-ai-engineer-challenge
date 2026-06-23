@@ -54,6 +54,12 @@ def test_health_endpoint_returns_healthy_status() -> None:
     assert response.json() == {"status": "healthy"}
 
 
+def test_public_health_endpoint_is_not_registered() -> None:
+    client = TestClient(main.build_app())
+
+    assert client.get("/public/health").status_code == 404
+
+
 @pytest.mark.parametrize("database_url", [None, "", "   "])
 def test_build_app_fails_fast_when_database_url_is_missing_or_blank(
     database_url: str | None, monkeypatch

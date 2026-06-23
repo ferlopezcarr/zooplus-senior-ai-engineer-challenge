@@ -14,7 +14,7 @@ from src.infrastructure.output.product_database_retriever import (
 
 
 def build_chat_router(use_case: ChatUseCase) -> APIRouter:
-    router = APIRouter()
+    router = APIRouter(prefix="/public")
 
     @router.post("/chat", response_model=ChatResponse)
     def chat_endpoint(body: ChatRequest) -> ChatResponse:

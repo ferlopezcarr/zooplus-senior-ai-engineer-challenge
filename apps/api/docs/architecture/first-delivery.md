@@ -1,6 +1,6 @@
 # First Delivery Overview
 
-> Historical snapshot: this document records the first delivery milestone and is kept for historical context. For current-state behavior, use `overview.md` and the API specs.
+> Historical snapshot: this document records the first delivery milestone and is kept for historical context. Route names in this file reflect that milestone date and may differ from the current `/public/*` and `/internal/*` API surface. For current-state behavior, use `overview.md` and the API specs.
 
 This document is the first standalone delivery note for the `apps/api` PoC. It summarizes that milestone's scope, runtime design, exposed behavior, operational setup, and implementation trade-offs without changing the execution-oriented README.
 
