@@ -69,7 +69,7 @@ def _build_auth_headers(token: str = INTERNAL_API_TOKEN) -> dict[str, str]:
 
 
 def _entry(*, has_embedding: bool):
-    from src.infrastructure.output.model import ProductEmbeddingEntry
+    from src.features.product.application.ports import ProductEmbeddingEntry
 
     return ProductEmbeddingEntry(
         article_id=ARTICLE_ID,
@@ -339,7 +339,7 @@ def test_product_embedding_endpoint_returns_404_when_row_disappears_on_save(
             return _entry(has_embedding=False)
 
         def save_embedding(self, article_id: int, embedding: list[float]) -> None:
-            from src.infrastructure.output.model.error import (
+            from src.features.product.infrastructure.output.http.errors import (
                 ProductEmbeddingEntryNotFoundError,
             )
 

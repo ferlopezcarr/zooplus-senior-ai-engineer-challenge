@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from src.domain.model import Chat, ChatResult, Product, Query, SiteId
-from src.infrastructure.input.http.chat.service.chat_mapper import (
+from src.features.chat.domain.model import Chat, ChatResult, Product, Query, SiteId
+from src.features.chat.infrastructure.input.http.chat_mapper import (
     to_chat,
     to_chat_response,
 )
-from src.infrastructure.input.http.chat.model import ChatRequest, ProductDTO
+from src.features.chat.infrastructure.input.http.model.chat_request import ChatRequest
+from src.features.chat.infrastructure.input.http.model.product_dto import ProductDTO
 
 
 def test_to_chat_maps_http_request_into_chat() -> None:

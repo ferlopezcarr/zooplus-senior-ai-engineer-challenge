@@ -6,10 +6,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
-from src.domain.model import Product
-from src.infrastructure.input.http.chat.model import ChatResponse, ProductDTO
-from src.infrastructure.output.model.error import CatalogDatabaseUnavailableError
-from src.infrastructure.output.product_database_retriever import (
+from src.features.chat.domain.model.product import Product
+from src.features.chat.infrastructure.input.http.model.chat_response import ChatResponse
+from src.features.chat.infrastructure.input.http.model.product_dto import ProductDTO
+from src.features.chat.infrastructure.output.http.errors import (
+    CatalogDatabaseUnavailableError,
+)
+from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     DatabaseProductRetriever,
 )
 

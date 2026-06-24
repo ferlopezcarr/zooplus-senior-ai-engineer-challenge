@@ -6,10 +6,10 @@ from urllib.error import HTTPError
 
 import pytest
 
-from src.application.model.response_context import ResponseContext
-from src.domain.model import Product
-from src.infrastructure.output.model.error import LlmProviderHttpError
-from src.infrastructure.output.llm_answer_client import (
+from src.features.chat.application.answer_context import ResponseContext
+from src.features.chat.domain.model.product import Product
+from src.features.chat.infrastructure.output.http.errors import LlmProviderHttpError
+from src.features.chat.infrastructure.output.http.llm_answer_client import (
     HTTP_ERROR_BODY_LIMIT,
     OpenAICompatibleAnswerClient,
     build_llm_chat_completions_url,
@@ -43,7 +43,8 @@ def test_openai_compatible_answer_client_posts_grounded_prompt(monkeypatch) -> N
         )
 
     monkeypatch.setattr(
-        "src.infrastructure.output.llm_answer_client.urlopen", stub_urlopen
+        "src.features.chat.infrastructure.output.http.llm_answer_client.urlopen",
+        stub_urlopen,
     )
 
     client = OpenAICompatibleAnswerClient(
@@ -172,7 +173,8 @@ def test_openai_compatible_answer_client_summarizes_http_errors(monkeypatch) -> 
         )
 
     monkeypatch.setattr(
-        "src.infrastructure.output.llm_answer_client.urlopen", stub_urlopen
+        "src.features.chat.infrastructure.output.http.llm_answer_client.urlopen",
+        stub_urlopen,
     )
 
     client = OpenAICompatibleAnswerClient(
@@ -218,7 +220,8 @@ def test_openai_compatible_answer_client_truncates_sanitized_http_error_body(
         )
 
     monkeypatch.setattr(
-        "src.infrastructure.output.llm_answer_client.urlopen", stub_urlopen
+        "src.features.chat.infrastructure.output.http.llm_answer_client.urlopen",
+        stub_urlopen,
     )
 
     client = OpenAICompatibleAnswerClient(

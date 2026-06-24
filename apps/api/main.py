@@ -9,33 +9,34 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from src.application.answer_generator import (
+from src.features.chat.application.answer_generator import (
     AnswerGenerator,
     DeterministicAnswerGenerator,
     LlmAnswerGenerator,
 )
-from src.application.use_case.chat_use_case import ChatUseCase
-from src.infrastructure.input.http.chat.chat_route import build_chat_router
-from src.infrastructure.input.http.product.product_embedding_route import (
-    build_product_embedding_router,
-)
-from src.infrastructure.output.embedding_client import (
-    DEFAULT_EMBEDDING_TIMEOUT_SECONDS,
-    OpenAICompatibleEmbeddingClient,
-    build_embeddings_url,
-)
-from src.infrastructure.output.model.error import EmbeddingConfigurationError
-from src.infrastructure.output.llm_answer_client import (
+from src.features.chat.application.chat_use_case import ChatUseCase
+from src.features.chat.infrastructure.input.http.chat_route import build_chat_router
+from src.features.chat.infrastructure.output.http.llm_answer_client import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     OpenAICompatibleAnswerClient,
     build_llm_chat_completions_url,
 )
-from src.infrastructure.output.product_embedding_store import (
-    DatabaseProductEmbeddingStore,
-)
-from src.infrastructure.output.product_database_retriever import (
+from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     PRODUCT_CATALOG_DATABASE_URL_ENV,
     DatabaseProductRetriever,
+)
+from src.features.product.application.product_embedding_use_case import (
+    ProductEmbeddingUseCase,
+)
+from src.features.product.infrastructure.input.http import (
+    build_product_embedding_router,
+)
+from src.features.product.infrastructure.output import (
+    DEFAULT_EMBEDDING_TIMEOUT_SECONDS,
+    DatabaseProductEmbeddingStore,
+    EmbeddingConfigurationError,
+    OpenAICompatibleEmbeddingClient,
+    build_embeddings_url,
 )
 
 DOTENV_PATH = Path(__file__).resolve().parent / ".env"
@@ -58,7 +59,6 @@ def build_app() -> FastAPI:
     )
 
     database_url = _get_required_database_url()
-    retriever = _build_product_retriever(database_url)
 
     @app.get("/")
     async def root() -> Mapping[str, str]:
@@ -72,18 +72,29 @@ def build_app() -> FastAPI:
 
         return {"status": "healthy"}
 
-    use_case = ChatUseCase(retriever, answer_generator=_build_answer_generator())
-    app.include_router(build_chat_router(use_case))
+    app.include_router(build_chat_router(_build_chat_use_case(database_url)))
     app.include_router(
         build_product_embedding_router(
-            database_url=database_url,
             internal_api_token=_get_non_blank_env("INTERNAL_API_TOKEN"),
-            embedding_client_factory=_build_embedding_client,
-            embedding_store_factory=DatabaseProductEmbeddingStore,
+            use_case=_build_product_embedding_use_case(database_url),
         )
     )
 
     return app
+
+
+def _build_chat_use_case(database_url: str) -> ChatUseCase:
+    return ChatUseCase(
+        _build_product_retriever(database_url),
+        answer_generator=_build_answer_generator(),
+    )
+
+
+def _build_product_embedding_use_case(database_url: str) -> ProductEmbeddingUseCase:
+    return ProductEmbeddingUseCase(
+        store=DatabaseProductEmbeddingStore(database_url),
+        embedding_provider_factory=_build_embedding_client,
+    )
 
 
 def _build_answer_generator() -> AnswerGenerator:

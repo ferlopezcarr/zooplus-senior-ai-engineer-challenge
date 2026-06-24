@@ -1,2 +1,0 @@
-class LlmProviderHttpError(RuntimeError):
-    pass

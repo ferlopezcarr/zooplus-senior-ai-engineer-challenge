@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
 import main
-from src.infrastructure.output.product_database_retriever import (
+from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     DatabaseProductRetriever,
     PRODUCT_CATALOG_DATABASE_URL_ENV,
 )

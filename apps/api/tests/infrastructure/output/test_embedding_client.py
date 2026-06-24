@@ -5,11 +5,13 @@ from urllib.error import HTTPError
 
 import pytest
 
-from src.infrastructure.output.embedding_client import (
+from src.features.product.infrastructure.output.http.embedding_client import (
     OpenAICompatibleEmbeddingClient,
     build_embeddings_url,
 )
-from src.infrastructure.output.model.error import EmbeddingProviderHttpError
+from src.features.product.infrastructure.output.http.errors import (
+    EmbeddingProviderHttpError,
+)
 
 
 def test_build_embeddings_url_rejects_non_https_url() -> None:
@@ -43,7 +45,8 @@ def test_embed_raises_safe_error_for_http_failure(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(
-        "src.infrastructure.output.embedding_client.urlopen", _raise_http_error
+        "src.features.product.infrastructure.output.http.embedding_client.urlopen",
+        _raise_http_error,
     )
 
     with pytest.raises(
@@ -70,7 +73,7 @@ def test_embed_raises_safe_error_for_malformed_body(monkeypatch) -> None:
             return json.dumps({"data": [{"oops": []}]}).encode("utf-8")
 
     monkeypatch.setattr(
-        "src.infrastructure.output.embedding_client.urlopen",
+        "src.features.product.infrastructure.output.http.embedding_client.urlopen",
         lambda request, timeout: StubResponse(),
     )
 

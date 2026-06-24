@@ -3,13 +3,19 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.dialects import postgresql
 
-from src.domain.model import Chat, Query, SiteId
-from src.infrastructure.output.model.error import CatalogDatabaseUnavailableError
-from src.infrastructure.output.product_database_retriever import (
+from src.features.chat.domain.model import Chat, Query, SiteId
+from src.features.chat.infrastructure.output.http.errors import (
+    CatalogDatabaseUnavailableError,
+)
+from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     LEXICAL_CANDIDATE_ROW_LIMIT,
     MAX_SQL_PREFILTER_TERMS,
     VECTOR_CANDIDATE_ROW_LIMIT,
     DatabaseProductRetriever,
+)
+from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
+    PRODUCT_SEARCHABLE_FIELDS,
+    build_product_search_text,
 )
 
 
@@ -512,4 +518,31 @@ def test_database_product_retriever_builds_vector_statement() -> None:
     assert (
         "ORDER BY (product_catalog_entries.embedding <=> %(embedding_1)s) ASC"
         in str(compiled)
+    )
+
+
+def test_product_search_text_uses_canonical_fields() -> None:
+    search_text = build_product_search_text(
+        {
+            "product_name": "Royal Canin",
+            "variant_name": "Digestive Care",
+            "summary": "Complete nutrition",
+            "description": "For sensitive adult dogs",
+            "pet_type": "dog",
+            "brands": "Royal Canin",
+            "ignored": "not included",
+        }
+    )
+
+    assert PRODUCT_SEARCHABLE_FIELDS == (
+        "product_name",
+        "variant_name",
+        "summary",
+        "description",
+        "pet_type",
+        "brands",
+    )
+    assert search_text == (
+        "royal canin digestive care complete nutrition "
+        "for sensitive adult dogs dog royal canin"
     )

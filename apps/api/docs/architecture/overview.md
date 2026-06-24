@@ -17,30 +17,34 @@
 ## Runtime Shape
 
 - `main.py` exposes `build_app()` and the runtime starts through `uvicorn main:build_app --factory`.
-- The current route surface exposes service metadata, a root operational health endpoint, public product-facing routes, and internal embedding maintenance routes.
-- `src/` reserves hexagonal package boundaries for domain, application, and infrastructure code.
+- The current route surface exposes service metadata, a root operational health endpoint, the public grounded chat route, and the internal embedding maintenance route.
+- Canonical runtime code lives under `src/features/` and `src/core/`.
 
 ## Package Boundaries
 
 | Path | Role |
 | --- | --- |
 | `main.py` | FastAPI bootstrap, `.env` loading, configuration validation, and route registration. |
-| `src/domain` | Domain boundary for core business concepts and rules, with domain models, value objects, and shared normalization service split by concern. |
-| `src/application` | Application boundary for use-case orchestration, response context, and answer-generation strategies. |
-| `src/infrastructure` | Infrastructure boundary for adapters and framework-facing code. |
-| `src/infrastructure/input` | Input adapter boundary. |
-| `src/infrastructure/input/http/chat` | HTTP chat adapter boundary for route wiring and transport/domain mapping. |
-| `src/infrastructure/input/http/chat/model` | HTTP DTO boundary for request, response, and nested transport models. |
-| `src/infrastructure/output` | Output adapter boundary for runtime retrieval, optional external answer generation, and related adapter helpers. |
-| `src/infrastructure/output/llm_answer_client.py` | OpenAI-compatible HTTP client for optional answer synthesis from retrieved catalog context. |
-| `src/infrastructure/output/service` | Output-adapter helpers for row-to-domain mapping. |
+| `src/core/service` | Shared text normalization used by chat retrieval/runtime and catalog feed preparation. |
+| `src/features/chat` | Chat vertical slice containing the chat-specific application, domain, and infrastructure code. |
+| `src/features/product` | Product vertical slice containing the internal embedding application flow and adapters. |
+| `src/features/chat/application` | Chat orchestration, answer generation, ports, and answer context. |
+| `src/features/chat/domain` | Chat-owned models (`Chat`, `Query`, `Product`, `SiteId`), plus guardrail/query-normalization rules. |
+| `src/features/chat/infrastructure` | Chat HTTP input plus retrieval orchestration, LLM, and adapter-specific concerns split by HTTP vs persistence. |
+| `src/features/chat/infrastructure/input/http` | Chat HTTP adapter package for `/public/chat`, with the route and mapper at the package root plus request/response DTOs under `model/`. |
+| `src/features/product/application` | Product embedding use case and capability-local ports. |
+| `src/features/product/infrastructure` | Product embedding HTTP input plus provider/store output adapters split by HTTP vs persistence concerns. |
+| `src/features/product/infrastructure/input/http` | Product embedding HTTP adapter package with the route at the package root plus response/status DTOs under `model/`. |
 | `tests` | API-local regression coverage. |
 
 ## Model and DTO Conventions
 
-- `src/domain/` contains domain models and value objects only, with one concept per file.
-- `src/domain/service/` contains domain-owned normalization logic reused by query validation and retrieval.
-- `src/infrastructure/input/http/chat/model/` contains FastAPI/Pydantic HTTP DTOs only.
+- `src/core/service/` contains only genuinely shared domain services used across more than one slice/runtime boundary.
+- Chat-owned catalog models stay under `src/features/chat/domain/model/` even when reused across chat application and infrastructure modules.
+- `src/features/chat/infrastructure/input/http/model/` contains the Pydantic DTOs used by the chat route and mapper.
+- `src/features/chat/infrastructure/output/http/` contains provider-facing HTTP clients and their errors, while `output/persistence/` contains PostgreSQL-backed retrieval code.
+- `src/features/product/infrastructure/input/http/model/` contains the embedding route response/status DTOs.
+- `src/features/product/infrastructure/output/http/` contains provider-facing embedding client code and errors, while `output/persistence/` contains the catalog repository and embedding store.
 - HTTP DTO names follow the transport-layer convention:
   - `...Request` for direct HTTP request body models.
   - `...Response` for direct HTTP endpoint response models.

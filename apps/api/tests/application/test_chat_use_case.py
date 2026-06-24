@@ -3,17 +3,17 @@ from __future__ import annotations
 import logging
 import pytest
 
-from src.application.answer_generator import (
+from src.features.chat.application.answer_generator import (
     DeterministicAnswerGenerator,
     LlmAnswerGenerator,
 )
-from src.application.model.response_context import ResponseContext
-from src.application.use_case.chat_use_case import ChatUseCase
-from src.domain.model import Chat, Product, Query, SiteId
-from src.domain.service import normalize_text
-from src.infrastructure.output.product_database_retriever import (
+from src.features.chat.application.answer_context import ResponseContext
+from src.features.chat.application.chat_use_case import ChatUseCase
+from src.features.chat.domain.model import Chat, Product, Query, SiteId
+from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     DatabaseProductRetriever,
 )
+from src.core.service.text_normalizer_service import normalize_text
 
 
 def _stub_retriever(products: list[Product]):

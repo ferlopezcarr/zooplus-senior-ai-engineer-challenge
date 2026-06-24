@@ -9,7 +9,7 @@ Record the current retrieval boundary for `apps/api`.
 - The running API reads product data from PostgreSQL only.
 - Retrieval stays scoped to the requested `site_id` before products are returned.
 - Query matching always has a lexical fallback using normalized product text from product name, variant name, summary, description, pet type, and brand fields.
-- Query normalization lives in `src/domain/service/text_normalizer_service.py`; row mapping stays under `src/infrastructure/output/service/`.
+- Query normalization lives in `src/core/service/text_normalizer_service.py`; product-catalog row mapping and searchable-field knowledge live under `src/features/product/infrastructure/output/persistence/product_catalog_repository.py`.
 - `POST /public/chat` attempts retrieval before applying the off-topic fallback so valid catalog-only brand queries can succeed.
 - Off-topic and no-result requests still return polite answers without invented products.
 - Off-topic requests must return `retrieved_products: []` even when lexical matching found catalog rows, unless the normalized query terms directly match the retrieved product search text (for example, valid brand-only catalog queries).

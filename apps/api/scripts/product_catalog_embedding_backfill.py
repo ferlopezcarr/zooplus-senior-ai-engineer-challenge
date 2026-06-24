@@ -23,12 +23,14 @@ from scripts.product_catalog_feed import (
     load_product_catalog_env,
     product_catalog_entries,
 )
-from src.infrastructure.output.embedding_client import (
+from src.features.product.infrastructure.output.http.embedding_client import (
     DEFAULT_EMBEDDING_TIMEOUT_SECONDS,
     OpenAICompatibleEmbeddingClient,
     build_embeddings_url,
 )
-from src.infrastructure.output.model.error import ProductEmbeddingEntryNotFoundError
+from src.features.product.infrastructure.output.http.errors import (
+    ProductEmbeddingEntryNotFoundError,
+)
 
 
 @dataclass(frozen=True)

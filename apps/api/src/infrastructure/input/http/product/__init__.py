@@ -1,1 +1,0 @@
-"""Product maintenance HTTP routes."""
