@@ -16,7 +16,7 @@ EMBEDDING_ROUTE = f"/internal/products/{ARTICLE_ID}/embedding"
 
 
 def _patch_database_retriever(monkeypatch) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -30,7 +30,7 @@ def _patch_database_retriever(monkeypatch) -> None:
         def retrieve(self, chat, limit: int = 3):
             return []
 
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
 
 def _patch_embedding_store(monkeypatch, *, entry):

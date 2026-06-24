@@ -27,7 +27,7 @@ def _clear_llm_env(monkeypatch) -> None:
     monkeypatch.setattr(main, "_missing_llm_config_warnings_emitted", set())
     monkeypatch.setattr(main, "_embedding_retrieval_warnings_emitted", set())
 
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -42,7 +42,7 @@ def _clear_llm_env(monkeypatch) -> None:
         def retrieve(self, chat, limit: int = 3):
             return []
 
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
 
 def test_root_endpoint_returns_service_status() -> None:
@@ -380,7 +380,7 @@ def test_build_app_uses_database_retriever_when_database_url_is_configured(
 ) -> None:
     captured: dict[str, str] = {}
 
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -399,7 +399,7 @@ def test_build_app_uses_database_retriever_when_database_url_is_configured(
         "PRODUCT_CATALOG_DATABASE_URL",
         TEST_DATABASE_URL,
     )
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
     caplog.set_level(logging.INFO)
 
     client = TestClient(main.build_app())
@@ -416,7 +416,7 @@ def test_build_app_uses_database_retriever_when_database_url_is_configured(
 
 
 def test_build_app_fails_fast_when_database_retriever_is_not_ready(monkeypatch) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(self, database_url: str, embedding_client_factory=None) -> None:
             self.database_url = database_url
 
@@ -427,14 +427,14 @@ def test_build_app_fails_fast_when_database_retriever_is_not_ready(monkeypatch) 
         "PRODUCT_CATALOG_DATABASE_URL",
         TEST_DATABASE_URL,
     )
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
     with pytest.raises(ValueError, match="PRODUCT_CATALOG_DATABASE_URL"):
         main.build_app()
 
 
 def test_build_app_retrieval_startup_error_stays_concise(monkeypatch) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(self, database_url: str, embedding_client_factory=None) -> None:
             self.database_url = database_url
 
@@ -445,7 +445,7 @@ def test_build_app_retrieval_startup_error_stays_concise(monkeypatch) -> None:
         "PRODUCT_CATALOG_DATABASE_URL",
         TEST_DATABASE_URL,
     )
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
     with pytest.raises(ValueError) as exc_info:
         main.build_app()
@@ -458,7 +458,7 @@ def test_build_app_retrieval_startup_error_stays_concise(monkeypatch) -> None:
 def test_build_app_does_not_log_raw_retrieval_startup_error(
     monkeypatch, caplog
 ) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(self, database_url: str, embedding_client_factory=None) -> None:
             self.database_url = database_url
 
@@ -469,7 +469,7 @@ def test_build_app_does_not_log_raw_retrieval_startup_error(
         "PRODUCT_CATALOG_DATABASE_URL",
         TEST_DATABASE_URL,
     )
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
     caplog.set_level(logging.WARNING)
 
     with pytest.raises(ValueError):

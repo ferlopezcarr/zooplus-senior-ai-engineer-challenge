@@ -44,7 +44,7 @@
 - `src/features/chat/infrastructure/input/http/model/` contains the Pydantic DTOs used by the chat route and mapper.
 - `src/features/chat/infrastructure/output/http/` contains provider-facing HTTP clients and their errors, while `output/persistence/` contains PostgreSQL-backed retrieval code.
 - `src/features/product/infrastructure/input/http/model/` contains the embedding route response/status DTOs.
-- `src/features/product/infrastructure/output/http/` contains provider-facing embedding client code and errors, while `output/persistence/` contains the catalog repository and embedding store.
+- `src/features/product/infrastructure/output/http/` contains provider-facing embedding client code and errors, while `output/persistence/` contains the catalog repository, catalog reader, and embedding store.
 - HTTP DTO names follow the transport-layer convention:
   - `...Request` for direct HTTP request body models.
   - `...Response` for direct HTTP endpoint response models.
@@ -94,7 +94,7 @@ flowchart LR
 - Manual local LLM e2e coverage exists via `make test-e2e`, but the default runtime and default test flow do not require LLM credentials.
 - The repository keeps local Docker Compose PostgreSQL + pgvector infrastructure under `infrastructure/local/docker-compose.yml`.
 - Manual persistence commands live under `apps/api` via Alembic and `python scripts/product_catalog_feed.py`; both commands load `apps/api/.env`, use the sync SQLAlchemy PostgreSQL URL form (`postgresql+psycopg://...`), and the feed preserves existing embeddings on rerun.
-- `build_app()` requires `PRODUCT_CATALOG_DATABASE_URL`, wires `/public/chat` for opportunistic pgvector retrieval with a `0.3` similarity threshold plus lexical top-up/fallback, and fails fast when the database readiness check fails.
+- `build_app()` requires `PRODUCT_CATALOG_DATABASE_URL`, wires `/public/chat` to a chat-owned retriever that delegates catalog SQL and readiness checks to the product-owned catalog reader, and preserves opportunistic pgvector retrieval with a `0.3` similarity threshold plus lexical top-up/fallback.
 - Public product-facing endpoints live under `/public/*`, while `GET /health` stays outside that namespace as the operational root health probe.
 - `/internal/*` always requires `INTERNAL_API_TOKEN`; missing token config makes internal routes unavailable with `503`, missing request headers return `401`, and wrong header values return `403`.
 - Lazy embedding provider config is only required when `POST /internal/products/{article_id}/embedding` generates or recalculates an embedding, while existing embeddings can still return `already_embedded` when `force=false`.

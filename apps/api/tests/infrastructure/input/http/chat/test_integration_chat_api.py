@@ -13,7 +13,7 @@ from src.features.chat.infrastructure.output.http.errors import (
     CatalogDatabaseUnavailableError,
 )
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
-    DatabaseProductRetriever,
+    ProductDatabaseRetriever,
 )
 
 
@@ -44,14 +44,14 @@ def _patch_database_retriever(
     vector_rows: list[dict[str, object]] | None = None,
     retrieval_error: Exception | None = None,
 ) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
             embedding_client_factory=None,
         ) -> None:
             assert database_url == TEST_DATABASE_URL
-            self._delegate = DatabaseProductRetriever(
+            self._delegate = ProductDatabaseRetriever(
                 database_url,
                 embedding_client_factory=embedding_client_factory,
             )
@@ -70,7 +70,7 @@ def _patch_database_retriever(
                     and row["site_id"] == site_id
                 ]
 
-            self._delegate._load_rows_for_site = _load_rows_for_site  # type: ignore[method-assign]
+            self._delegate._catalog_reader.load_rows_for_site = _load_rows_for_site  # type: ignore[method-assign]
 
             def _load_vector_rows_for_site(
                 site_id: int,
@@ -87,7 +87,9 @@ def _patch_database_retriever(
                     and row["site_id"] == site_id
                 ]
 
-            self._delegate._load_vector_rows_for_site = _load_vector_rows_for_site  # type: ignore[method-assign]
+            self._delegate._catalog_reader.load_vector_rows_for_site = (
+                _load_vector_rows_for_site  # type: ignore[method-assign]
+            )
 
         def readiness_error(self) -> str | None:
             return None
@@ -97,7 +99,7 @@ def _patch_database_retriever(
                 raise retrieval_error
             return self._delegate.retrieve(chat, limit=limit)
 
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
 
 @pytest.fixture(autouse=True)
@@ -137,7 +139,7 @@ def test_chat_endpoint_returns_postgresql_backed_products() -> None:
 
 
 def test_chat_endpoint_hides_products_for_off_topic_queries(monkeypatch) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -165,7 +167,7 @@ def test_chat_endpoint_hides_products_for_off_topic_queries(monkeypatch) -> None
                 )
             ]
 
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
     client = TestClient(main.build_app())
     response = client.post(
@@ -183,7 +185,7 @@ def test_chat_endpoint_hides_products_for_off_topic_queries(monkeypatch) -> None
 def test_chat_endpoint_hides_products_for_single_word_off_topic_queries(
     monkeypatch,
 ) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -211,7 +213,7 @@ def test_chat_endpoint_hides_products_for_single_word_off_topic_queries(
                 )
             ]
 
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
     client = TestClient(main.build_app())
     response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "bitcoin"})
@@ -298,7 +300,7 @@ def test_chat_endpoint_allows_multi_word_brand_catalog_queries(monkeypatch) -> N
 def test_chat_endpoint_uses_database_retriever_when_database_url_is_configured(
     monkeypatch,
 ) -> None:
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -327,7 +329,7 @@ def test_chat_endpoint_uses_database_retriever_when_database_url_is_configured(
                 )
             ]
 
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
 
     client = TestClient(main.build_app())
     response = client.post(CHAT_ROUTE, json={"site_id": 77, "query": "env ball"})
@@ -352,7 +354,7 @@ def test_chat_endpoint_enables_vector_retrieval_when_embedding_config_is_complet
 ) -> None:
     captured: dict[str, object] = {}
 
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -381,7 +383,7 @@ def test_chat_endpoint_enables_vector_retrieval_when_embedding_config_is_complet
     )
     monkeypatch.setenv("EMBEDDING_API_KEY", "secret")
     monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
     monkeypatch.setattr(main, "OpenAICompatibleEmbeddingClient", StubEmbeddingClient)
 
     main.build_app()
@@ -531,7 +533,7 @@ def test_chat_endpoint_disables_vector_retrieval_when_embedding_config_is_invali
 ) -> None:
     captured: dict[str, object] = {}
 
-    class StubDatabaseProductRetriever:
+    class StubProductDatabaseRetriever:
         def __init__(
             self,
             database_url: str,
@@ -551,7 +553,7 @@ def test_chat_endpoint_disables_vector_retrieval_when_embedding_config_is_invali
     )
     monkeypatch.setenv("EMBEDDING_API_KEY", "secret")
     monkeypatch.setenv("EMBEDDING_MODEL", "test-embedding-model")
-    monkeypatch.setattr(main, "DatabaseProductRetriever", StubDatabaseProductRetriever)
+    monkeypatch.setattr(main, "ProductDatabaseRetriever", StubProductDatabaseRetriever)
     caplog.set_level("WARNING")
 
     main.build_app()

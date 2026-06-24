@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 import main
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
-    DatabaseProductRetriever,
+    ProductDatabaseRetriever,
     PRODUCT_CATALOG_DATABASE_URL_ENV,
 )
 
@@ -39,7 +39,7 @@ def _load_runtime_config() -> RuntimeConfig:
         )
 
     try:
-        readiness_error = DatabaseProductRetriever(database_url).readiness_error()
+        readiness_error = ProductDatabaseRetriever(database_url).readiness_error()
     except Exception:
         readiness_error = "database check failed"
 

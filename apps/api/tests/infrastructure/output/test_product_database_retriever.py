@@ -1,28 +1,20 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy.dialects import postgresql
 
 from src.features.chat.domain.model import Chat, Query, SiteId
 from src.features.chat.infrastructure.output.http.errors import (
     CatalogDatabaseUnavailableError,
 )
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
-    LEXICAL_CANDIDATE_ROW_LIMIT,
-    MAX_SQL_PREFILTER_TERMS,
-    VECTOR_CANDIDATE_ROW_LIMIT,
-    DatabaseProductRetriever,
-)
-from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
-    PRODUCT_SEARCHABLE_FIELDS,
-    build_product_search_text,
+    ProductDatabaseRetriever,
 )
 
 
 def test_database_product_retriever_orders_results_by_lexical_score(
     monkeypatch,
 ) -> None:
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
@@ -71,7 +63,9 @@ def test_database_product_retriever_orders_results_by_lexical_score(
             },
         ]
 
-    monkeypatch.setattr(retriever, "_load_rows_for_site", _load_rows_for_site)
+    monkeypatch.setattr(
+        retriever._catalog_reader, "load_rows_for_site", _load_rows_for_site
+    )
 
     results = retriever.retrieve(Chat(site_id=SiteId(1), query=Query("dog ball fetch")))
 
@@ -87,7 +81,7 @@ def test_database_product_retriever_prefers_vector_results_and_tops_up_lexical(
             assert text == "env ball"
             return [0.1, 0.2]
 
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog",
         embedding_client_factory=lambda: StubEmbeddingClient(),
     )
@@ -151,9 +145,13 @@ def test_database_product_retriever_prefers_vector_results_and_tops_up_lexical(
         ]
 
     monkeypatch.setattr(
-        retriever, "_load_vector_rows_for_site", _load_vector_rows_for_site
+        retriever._catalog_reader,
+        "load_vector_rows_for_site",
+        _load_vector_rows_for_site,
     )
-    monkeypatch.setattr(retriever, "_load_rows_for_site", _load_rows_for_site)
+    monkeypatch.setattr(
+        retriever._catalog_reader, "load_rows_for_site", _load_rows_for_site
+    )
 
     results = retriever.retrieve(Chat(site_id=SiteId(77), query=Query("env ball")))
 
@@ -170,7 +168,7 @@ def test_database_product_retriever_uses_minimum_vector_similarity_threshold(
             assert text == "dog ball"
             return [0.1, 0.2]
 
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog",
         embedding_client_factory=lambda: StubEmbeddingClient(),
     )
@@ -235,9 +233,13 @@ def test_database_product_retriever_uses_minimum_vector_similarity_threshold(
         ]
 
     monkeypatch.setattr(
-        retriever, "_load_vector_rows_for_site", _load_vector_rows_for_site
+        retriever._catalog_reader,
+        "load_vector_rows_for_site",
+        _load_vector_rows_for_site,
     )
-    monkeypatch.setattr(retriever, "_load_rows_for_site", _load_rows_for_site)
+    monkeypatch.setattr(
+        retriever._catalog_reader, "load_rows_for_site", _load_rows_for_site
+    )
 
     results = retriever.retrieve(Chat(site_id=SiteId(1), query=Query("dog ball")))
 
@@ -254,7 +256,7 @@ def test_database_product_retriever_falls_back_to_lexical_when_embedding_fails(
             assert text == "env ball"
             raise RuntimeError("embedding offline")
 
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog",
         embedding_client_factory=lambda: FailingEmbeddingClient(),
     )
@@ -280,7 +282,9 @@ def test_database_product_retriever_falls_back_to_lexical_when_embedding_fails(
             }
         ]
 
-    monkeypatch.setattr(retriever, "_load_rows_for_site", _load_rows_for_site)
+    monkeypatch.setattr(
+        retriever._catalog_reader, "load_rows_for_site", _load_rows_for_site
+    )
     caplog.set_level("WARNING")
 
     results = retriever.retrieve(Chat(site_id=SiteId(77), query=Query("env ball")))
@@ -299,7 +303,7 @@ def test_database_product_retriever_ignores_zero_similarity_vector_saturation(
             assert text == "dog ball"
             return [0.1, 0.2]
 
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog",
         embedding_client_factory=lambda: StubEmbeddingClient(),
     )
@@ -389,9 +393,13 @@ def test_database_product_retriever_ignores_zero_similarity_vector_saturation(
         ]
 
     monkeypatch.setattr(
-        retriever, "_load_vector_rows_for_site", _load_vector_rows_for_site
+        retriever._catalog_reader,
+        "load_vector_rows_for_site",
+        _load_vector_rows_for_site,
     )
-    monkeypatch.setattr(retriever, "_load_rows_for_site", _load_rows_for_site)
+    monkeypatch.setattr(
+        retriever._catalog_reader, "load_rows_for_site", _load_rows_for_site
+    )
 
     results = retriever.retrieve(Chat(site_id=SiteId(1), query=Query("dog ball")))
 
@@ -400,7 +408,7 @@ def test_database_product_retriever_ignores_zero_similarity_vector_saturation(
 
 
 def test_database_product_retriever_wraps_database_failures(monkeypatch) -> None:
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
@@ -412,7 +420,9 @@ def test_database_product_retriever_wraps_database_failures(monkeypatch) -> None
         assert query_terms == {"dog", "food"}
         raise OSError("database offline")
 
-    monkeypatch.setattr(retriever, "_load_rows_for_site", _load_rows_for_site)
+    monkeypatch.setattr(
+        retriever._catalog_reader, "load_rows_for_site", _load_rows_for_site
+    )
 
     with pytest.raises(
         CatalogDatabaseUnavailableError,
@@ -422,7 +432,7 @@ def test_database_product_retriever_wraps_database_failures(monkeypatch) -> None
 
 
 def test_readiness_error_returns_none_when_validation_succeeds(monkeypatch) -> None:
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
     captured: dict[str, bool] = {"validated": False}
@@ -430,119 +440,28 @@ def test_readiness_error_returns_none_when_validation_succeeds(monkeypatch) -> N
     def _validate_database() -> None:
         captured["validated"] = True
 
-    monkeypatch.setattr(retriever, "_validate_database", _validate_database)
+    monkeypatch.setattr(
+        retriever._catalog_reader,
+        "validate_database",
+        _validate_database,
+    )
 
     assert retriever.readiness_error() is None
     assert captured["validated"] is True
 
 
 def test_readiness_error_returns_validation_failure(monkeypatch) -> None:
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
     def _validate_database() -> None:
         raise ValueError("invalid catalog credentials")
 
-    monkeypatch.setattr(retriever, "_validate_database", _validate_database)
+    monkeypatch.setattr(
+        retriever._catalog_reader,
+        "validate_database",
+        _validate_database,
+    )
 
     assert retriever.readiness_error() == "invalid catalog credentials"
-
-
-def test_database_product_retriever_bounds_sql_candidates() -> None:
-    retriever = DatabaseProductRetriever(
-        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
-    )
-
-    statement = retriever._build_candidate_statement(1, {"dog", "ball"})
-    compiled = statement.compile(dialect=postgresql.dialect())
-
-    assert compiled.params["site_id_1"] == 1
-    assert compiled.params["param_1"] == LEXICAL_CANDIDATE_ROW_LIMIT
-    assert compiled.params["product_name_1"] == "%ball%"
-    assert compiled.params["product_name_2"] == "%dog%"
-    assert "ORDER BY product_catalog_entries.article_id ASC" in str(compiled)
-    assert "LIMIT %(param_1)s" in str(compiled)
-
-
-def test_database_product_retriever_caps_sql_prefilter_terms() -> None:
-    retriever = DatabaseProductRetriever(
-        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
-    )
-
-    query_terms = {
-        "dog",
-        "ball",
-        "fetch",
-        "durable",
-        "chew",
-        "indoor",
-        "outdoor",
-        "treat",
-    }
-
-    statement = retriever._build_candidate_statement(1, query_terms)
-    compiled = statement.compile(dialect=postgresql.dialect())
-
-    ilike_params = {
-        key: value
-        for key, value in compiled.params.items()
-        if key.startswith("product_name_")
-    }
-
-    assert len(ilike_params) == MAX_SQL_PREFILTER_TERMS
-    assert set(ilike_params.values()) == {
-        "%durable%",
-        "%outdoor%",
-        "%indoor%",
-        "%fetch%",
-        "%ball%",
-        "%treat%",
-    }
-
-
-def test_database_product_retriever_builds_vector_statement() -> None:
-    retriever = DatabaseProductRetriever(
-        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
-    )
-
-    statement = retriever._build_vector_statement(1, [0.1, 0.2], limit=9)
-    compiled = statement.compile(dialect=postgresql.dialect())
-
-    assert compiled.params["site_id_1"] == 1
-    assert compiled.params["embedding_1"] == [0.1, 0.2]
-    assert compiled.params["param_1"] == pytest.approx(0.7)
-    assert compiled.params["param_2"] == VECTOR_CANDIDATE_ROW_LIMIT
-    assert "embedding IS NOT NULL" in str(compiled)
-    assert "<= %(param_1)s" in str(compiled)
-    assert (
-        "ORDER BY (product_catalog_entries.embedding <=> %(embedding_1)s) ASC"
-        in str(compiled)
-    )
-
-
-def test_product_search_text_uses_canonical_fields() -> None:
-    search_text = build_product_search_text(
-        {
-            "product_name": "Royal Canin",
-            "variant_name": "Digestive Care",
-            "summary": "Complete nutrition",
-            "description": "For sensitive adult dogs",
-            "pet_type": "dog",
-            "brands": "Royal Canin",
-            "ignored": "not included",
-        }
-    )
-
-    assert PRODUCT_SEARCHABLE_FIELDS == (
-        "product_name",
-        "variant_name",
-        "summary",
-        "description",
-        "pet_type",
-        "brands",
-    )
-    assert search_text == (
-        "royal canin digestive care complete nutrition "
-        "for sensitive adult dogs dog royal canin"
-    )

@@ -10,7 +10,7 @@ from src.features.chat.infrastructure.output.http.llm_answer_client import (
 )
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     PRODUCT_CATALOG_DATABASE_URL_ENV,
-    DatabaseProductRetriever,
+    ProductDatabaseRetriever,
 )
 
 __all__ = [
@@ -19,7 +19,7 @@ __all__ = [
     "CatalogDatabaseUnavailableError",
     "OpenAICompatibleAnswerClient",
     "PRODUCT_CATALOG_DATABASE_URL_ENV",
-    "DatabaseProductRetriever",
+    "ProductDatabaseRetriever",
     "LlmProviderHttpError",
     "build_llm_chat_completions_url",
 ]

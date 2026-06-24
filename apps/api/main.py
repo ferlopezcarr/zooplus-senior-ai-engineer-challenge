@@ -23,7 +23,7 @@ from src.features.chat.infrastructure.output.http.llm_answer_client import (
 )
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     PRODUCT_CATALOG_DATABASE_URL_ENV,
-    DatabaseProductRetriever,
+    ProductDatabaseRetriever,
 )
 from src.features.product.application.product_embedding_use_case import (
     ProductEmbeddingUseCase,
@@ -136,9 +136,9 @@ def _get_required_database_url() -> str:
     return database_url
 
 
-def _build_product_retriever(database_url: str) -> DatabaseProductRetriever:
+def _build_product_retriever(database_url: str) -> ProductDatabaseRetriever:
 
-    retriever = DatabaseProductRetriever(
+    retriever = ProductDatabaseRetriever(
         database_url,
         embedding_client_factory=_build_chat_embedding_client_factory(),
     )

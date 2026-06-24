@@ -11,7 +11,7 @@ from src.features.chat.application.answer_context import ResponseContext
 from src.features.chat.application.chat_use_case import ChatUseCase
 from src.features.chat.domain.model import Chat, Product, Query, SiteId
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
-    DatabaseProductRetriever,
+    ProductDatabaseRetriever,
 )
 from src.core.service.text_normalizer_service import normalize_text
 
@@ -24,8 +24,8 @@ def _stub_retriever(products: list[Product]):
     return StubRetriever()
 
 
-def _database_retriever(rows: list[dict[str, object]]) -> DatabaseProductRetriever:
-    retriever = DatabaseProductRetriever(
+def _database_retriever(rows: list[dict[str, object]]) -> ProductDatabaseRetriever:
+    retriever = ProductDatabaseRetriever(
         "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
     )
 
@@ -42,7 +42,7 @@ def _database_retriever(rows: list[dict[str, object]]) -> DatabaseProductRetriev
             and row["site_id"] == site_id
         ]
 
-    retriever._load_rows_for_site = _load_rows_for_site  # type: ignore[method-assign]
+    retriever._catalog_reader.load_rows_for_site = _load_rows_for_site  # type: ignore[method-assign]
     return retriever
 
 
