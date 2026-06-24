@@ -2,6 +2,8 @@
 
 Monorepo-style repository for a product-grounded assistant PoC. The current deployable unit is `apps/api`.
 
+> Assignment-facing summary: see [`SUBMISSION.md`](SUBMISSION.md).
+
 ## Documentation Ownership
 
 | If you need... | Canonical location |
