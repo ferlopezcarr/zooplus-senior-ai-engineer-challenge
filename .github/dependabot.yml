@@ -9,3 +9,8 @@ updates:
     directory: "/apps/api"
     schedule:
       interval: weekly
+
+  - package-ecosystem: docker
+    directory: "/infrastructure/local"
+    schedule:
+      interval: weekly
