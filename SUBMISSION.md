@@ -2,6 +2,53 @@
 
 This document is the assignment-facing submission artifact for the Zooplus Assistant PoC. It is intentionally self-contained: it summarizes the repository shape, the implemented solution, how to run it, the main trade-offs, and the next sensible steps.
 
+## TL;DR (for evaluator)
+
+- `POST /public/chat` accepts `site_id` + `query` and returns an `answer` plus `retrieved_products`.
+- The assistant answers only pet-product questions grounded in the requested catalog context.
+- Off-topic queries return a polite refusal and return no retrieved products.
+
+## Concrete API Contract
+
+- **Endpoint:** `POST /public/chat`
+- **Request body (JSON):**
+
+```json
+{
+  "site_id": 1,
+  "query": "dog food"
+}
+```
+
+- **Success response body (JSON):**
+
+```json
+{
+  "answer": "Here are some pet products that match your query.",
+  "retrieved_products": [
+    {
+      "article_id": 1234,
+      "product_id": "example-product",
+      "variant_id": "example-product-1",
+      "title": "Example Dog Food",
+      "summary": "sample summary text",
+      "site_id": 1,
+      "category": "dog",
+      "score": 0.91
+    }
+  ]
+}
+```
+
+- **Off-topic refusal response body (JSON):**
+
+```json
+{
+  "answer": "I can only help with pet products that exist in the provided catalog.",
+  "retrieved_products": []
+}
+```
+
 ## Repository Context
 
 - The repository uses a monorepo-style layout, but `apps/api` is the only current deployable unit.
@@ -54,6 +101,12 @@ The retrieval path is intentionally hybrid:
 4. Responses stay site-scoped and grounded in retrieved catalog products.
 
 This means the system gets better relevance when embeddings are available, without making embedding generation a hard startup dependency for the public chat route.
+
+### Guardrails and constraints
+
+- Only pet-product-related queries are answered.
+- Off-topic queries are answered with: `I can only help with pet products that exist in the provided catalog.`, and `retrieved_products` is empty.
+- Retrieval is always constrained by `site_id`, so results remain within that catalog scope.
 
 ## Setup and Execution
 
@@ -140,7 +193,7 @@ Regression checks:
 
 **Decision:** The service uses FastAPI, but the current `POST /public/chat` path remains synchronous end-to-end.
 
-**Why:** For this PoC, sync SQLAlchemy engine usage and standard-library HTTP clients keep the implementation smaller, easier to reason about, and easy to run locally without adding async database/client complexity everywhere.
+**Why (PoC trade-off):** For this PoC, sync SQLAlchemy engine usage and standard-library HTTP clients keep the implementation smaller, easier to reason about, and easy to run locally.
 
 **Trade-off:** This is an explicit design choice for a pragmatic PoC, not the best long-term concurrency model. Under higher traffic, fully async database/provider integration or background execution boundaries would be a better fit. The current hexagonal structure keeps the blocking database and vendor integrations behind infrastructure adapters, which contains the impact of a future change.
 
@@ -154,10 +207,18 @@ Regression checks:
 
 **Additional PoC scope note:** LLM-provider HTTP failures already get an initial sanitization and truncation pass before they are logged. That pass reduces obvious leakage risk, but it is not an exhaustive sanitizer for arbitrary third-party payloads. Other provider-facing paths avoid surfacing provider bodies by collapsing failures to generic API errors. More exhaustive provider-error normalization would be a sensible follow-up outside the current PoC scope.
 
+### 6. Retrieval-grounded answers without strict post-generation verification
+
+**Decision:** Retrieval is grounded in the provided catalog dataset, and answers are generated from the retrieved product context.
+
+**Why:** It keeps the PoC anchored to concrete catalog evidence while still delivering a useful chat response.
+
+**Trade-off:** The current flow does not yet enforce a strict post-generation grounding verification step, so grounding depends on retrieval quality and prompt/application constraints rather than on a final answer-validation pass.
+
 ## Future Roadmap
 
 1. Move sync database/provider integrations to explicit async or worker-backed boundaries for better concurrency behavior.
-2. Improve retrieval quality with stronger ranking, richer evaluation data, and clearer observability around vector-vs-lexical outcomes.
-3. Add ingestion/backfill automation so local and deployment setup require fewer manual steps.
-4. Add production-oriented auth, rate limiting, and structured monitoring around the public chat route.
-5. Expand answer quality and grounding verification with dataset-focused evaluation suites.
+2. Add stronger grounding enforcement so returned answers are explicitly validated against the retrieved context.
+3. Improve retrieval quality with richer ranking, richer evaluation data, and clearer observability around vector-vs-lexical outcomes.
+4. Add ingestion/backfill automation so local and deployment setup require fewer manual steps.
+5. Add production-oriented auth, rate limiting, and structured monitoring around the public chat route.
