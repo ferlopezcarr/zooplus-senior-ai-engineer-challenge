@@ -8,10 +8,12 @@ from src.features.product.infrastructure.output.persistence.product_catalog_read
     MAXIMUM_VECTOR_DISTANCE,
     MAX_SQL_PREFILTER_TERMS,
     ProductCatalogReader,
+    ProductCatalogVectorMatch,
     VECTOR_CANDIDATE_ROW_LIMIT,
 )
 from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
     PRODUCT_SEARCHABLE_FIELDS,
+    ProductCatalogRecord,
     build_product_search_text,
 )
 
@@ -114,7 +116,20 @@ def test_product_catalog_reader_loads_rows_for_site_via_public_method(
 
     rows = reader.load_rows_for_site(1, query_terms)
 
-    assert rows == returned_rows
+    assert rows == [
+        ProductCatalogRecord(
+            article_id=4001,
+            product_id="alpha-ball",
+            variant_id="alpha-ball-1",
+            site_id=1,
+            pet_type="dog",
+            brands="Alpha",
+            product_name="Alpha Ball",
+            variant_name="Toy",
+            summary="ball for dog play",
+            description="durable dog toy",
+        )
+    ]
     assert engine.disposed is True
     assert len(engine.connection.executed_statements) == 1
 
@@ -168,7 +183,23 @@ def test_product_catalog_reader_loads_vector_rows_for_site_via_public_method(
 
     rows = reader.load_vector_rows_for_site(77, [0.1, 0.2], limit=9)
 
-    assert rows == returned_rows
+    assert rows == [
+        ProductCatalogVectorMatch(
+            record=ProductCatalogRecord(
+                article_id=2002,
+                product_id="vector-ball",
+                variant_id="vector-ball-1",
+                site_id=77,
+                pet_type="dog",
+                brands="Vector",
+                product_name="Vector Ball",
+                variant_name="Dog Toy",
+                summary="semantic match",
+                description="embedding hit",
+            ),
+            distance=0.1,
+        )
+    ]
     assert engine.disposed is True
     assert len(engine.connection.executed_statements) == 1
 
@@ -210,6 +241,26 @@ def test_product_search_text_uses_canonical_fields() -> None:
         "brands",
     )
     assert search_text == (
+        "royal canin digestive care complete nutrition "
+        "for sensitive adult dogs dog royal canin"
+    )
+
+
+def test_product_catalog_record_exposes_search_text_property() -> None:
+    record = ProductCatalogRecord(
+        article_id=1,
+        product_id="royal-canin",
+        variant_id="royal-canin-1",
+        site_id=77,
+        pet_type="dog",
+        brands="Royal Canin",
+        product_name="Royal Canin",
+        variant_name="Digestive Care",
+        summary="Complete nutrition",
+        description="For sensitive adult dogs",
+    )
+
+    assert record.search_text == (
         "royal canin digestive care complete nutrition "
         "for sensitive adult dogs dog royal canin"
     )

@@ -55,6 +55,10 @@ class ProductCatalogRecord:
     def title(self) -> str:
         return f"{self.product_name} - {self.variant_name}"
 
+    @property
+    def search_text(self) -> str:
+        return normalize_query(" ".join(_product_searchable_field_values(self)))
+
 
 def to_product_catalog_record(row: Mapping[str, object]) -> ProductCatalogRecord:
     return ProductCatalogRecord(
@@ -72,6 +76,9 @@ def to_product_catalog_record(row: Mapping[str, object]) -> ProductCatalogRecord
 
 
 def build_product_search_text(row: Mapping[str, object] | ProductCatalogRecord) -> str:
+    if isinstance(row, ProductCatalogRecord):
+        return row.search_text
+
     return normalize_query(" ".join(_product_searchable_field_values(row)))
 
 

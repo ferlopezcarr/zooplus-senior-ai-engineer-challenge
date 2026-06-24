@@ -14,6 +14,10 @@ from src.features.chat.infrastructure.output.persistence.product_database_retrie
     ProductDatabaseRetriever,
 )
 from src.core.service.text_normalizer_service import normalize_text
+from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
+    ProductCatalogRecord,
+    to_product_catalog_record,
+)
 
 
 def _stub_retriever(products: list[Product]):
@@ -32,10 +36,10 @@ def _database_retriever(rows: list[dict[str, object]]) -> ProductDatabaseRetriev
     def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         del query_terms
         return [
-            row
+            to_product_catalog_record(row)
             for row in rows
             if isinstance(row["site_id"], int)
             and not isinstance(row["site_id"], bool)

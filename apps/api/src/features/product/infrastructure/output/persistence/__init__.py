@@ -3,6 +3,7 @@ from src.features.product.infrastructure.output.persistence.product_catalog_read
     MAX_SQL_PREFILTER_TERMS,
     MINIMUM_VECTOR_SIMILARITY,
     ProductCatalogReader,
+    ProductCatalogVectorMatch,
     VECTOR_CANDIDATE_ROW_LIMIT,
 )
 from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
@@ -24,6 +25,7 @@ __all__ = [
     "PRODUCT_SEARCHABLE_FIELDS",
     "ProductCatalogReader",
     "ProductCatalogRecord",
+    "ProductCatalogVectorMatch",
     "VECTOR_CANDIDATE_ROW_LIMIT",
     "build_product_search_text",
     "product_catalog_entries",

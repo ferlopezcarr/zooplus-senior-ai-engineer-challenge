@@ -15,6 +15,13 @@ from src.features.chat.infrastructure.output.http.errors import (
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     ProductDatabaseRetriever,
 )
+from src.features.product.infrastructure.output.persistence.product_catalog_reader import (
+    ProductCatalogVectorMatch,
+)
+from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
+    ProductCatalogRecord,
+    to_product_catalog_record,
+)
 
 
 TEST_DATABASE_URL = (
@@ -60,10 +67,10 @@ def _patch_database_retriever(
             def _load_rows_for_site(
                 site_id: int,
                 query_terms: set[str],
-            ) -> list[dict[str, object]]:
+            ) -> list[ProductCatalogRecord]:
                 del query_terms
                 return [
-                    row
+                    to_product_catalog_record(row)
                     for row in (rows or [])
                     if isinstance(row["site_id"], int)
                     and not isinstance(row["site_id"], bool)
@@ -77,10 +84,13 @@ def _patch_database_retriever(
                 embedding: list[float],
                 *,
                 limit: int,
-            ) -> list[dict[str, object]]:
+            ) -> list[ProductCatalogVectorMatch]:
                 del embedding
                 return [
-                    row
+                    ProductCatalogVectorMatch(
+                        record=to_product_catalog_record(row),
+                        distance=float(row["distance"]),
+                    )
                     for row in (vector_rows or [])[:limit]
                     if isinstance(row["site_id"], int)
                     and not isinstance(row["site_id"], bool)

@@ -9,6 +9,36 @@ from src.features.chat.infrastructure.output.http.errors import (
 from src.features.chat.infrastructure.output.persistence.product_database_retriever import (
     ProductDatabaseRetriever,
 )
+from src.features.product.infrastructure.output.persistence.product_catalog_reader import (
+    ProductCatalogVectorMatch,
+)
+from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
+    ProductCatalogRecord,
+)
+
+
+def _catalog_record(**overrides: object) -> ProductCatalogRecord:
+    values: dict[str, object] = {
+        "article_id": 0,
+        "product_id": "product-0",
+        "variant_id": "variant-0",
+        "site_id": 1,
+        "pet_type": "dog",
+        "brands": "Brand",
+        "product_name": "Product",
+        "variant_name": "Variant",
+        "summary": "summary",
+        "description": "description",
+    }
+    values.update(overrides)
+    return ProductCatalogRecord(**values)
+
+
+def _vector_match(*, distance: float, **overrides: object) -> ProductCatalogVectorMatch:
+    return ProductCatalogVectorMatch(
+        record=_catalog_record(**overrides),
+        distance=distance,
+    )
 
 
 def test_database_product_retriever_orders_results_by_lexical_score(
@@ -21,46 +51,40 @@ def test_database_product_retriever_orders_results_by_lexical_score(
     def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         assert site_id == 1
         assert query_terms == {"dog", "ball", "fetch"}
         return [
-            {
-                "article_id": 4002,
-                "product_id": "beta-ball",
-                "variant_id": "beta-ball-1",
-                "product_name": "Beta Ball",
-                "variant_name": "Dog Toy",
-                "summary": "ball for dog play",
-                "description": "durable dog toy",
-                "pet_type": "dog",
-                "brands": "Beta",
-                "site_id": 1,
-            },
-            {
-                "article_id": 4001,
-                "product_id": "alpha-ball",
-                "variant_id": "alpha-ball-1",
-                "product_name": "Alpha Ball",
-                "variant_name": "Dog Toy",
-                "summary": "ball for dog play",
-                "description": "light dog toy",
-                "pet_type": "dog",
-                "brands": "Alpha",
-                "site_id": 1,
-            },
-            {
-                "article_id": 4000,
-                "product_id": "omega-ball",
-                "variant_id": "omega-ball-1",
-                "product_name": "Omega Ball",
-                "variant_name": "Dog Fetch",
-                "summary": "ball for dog fetch",
-                "description": "fetch toy",
-                "pet_type": "dog",
-                "brands": "Omega",
-                "site_id": 1,
-            },
+            _catalog_record(
+                article_id=4002,
+                product_id="beta-ball",
+                variant_id="beta-ball-1",
+                product_name="Beta Ball",
+                variant_name="Dog Toy",
+                summary="ball for dog play",
+                description="durable dog toy",
+                brands="Beta",
+            ),
+            _catalog_record(
+                article_id=4001,
+                product_id="alpha-ball",
+                variant_id="alpha-ball-1",
+                product_name="Alpha Ball",
+                variant_name="Dog Toy",
+                summary="ball for dog play",
+                description="light dog toy",
+                brands="Alpha",
+            ),
+            _catalog_record(
+                article_id=4000,
+                product_id="omega-ball",
+                variant_id="omega-ball-1",
+                product_name="Omega Ball",
+                variant_name="Dog Fetch",
+                summary="ball for dog fetch",
+                description="fetch toy",
+                brands="Omega",
+            ),
         ]
 
     monkeypatch.setattr(
@@ -91,57 +115,54 @@ def test_database_product_retriever_prefers_vector_results_and_tops_up_lexical(
         embedding: list[float],
         *,
         limit: int,
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogVectorMatch]:
         assert site_id == 77
         assert embedding == [0.1, 0.2]
         assert limit == 3
         return [
-            {
-                "article_id": 2002,
-                "product_id": "vector-ball",
-                "variant_id": "vector-ball-1",
-                "product_name": "Vector Ball",
-                "variant_name": "Dog Toy",
-                "summary": "semantic match",
-                "description": "embedding hit",
-                "pet_type": "dog",
-                "brands": "Vector",
-                "site_id": 77,
-                "distance": 0.1,
-            }
+            _vector_match(
+                distance=0.1,
+                article_id=2002,
+                product_id="vector-ball",
+                variant_id="vector-ball-1",
+                product_name="Vector Ball",
+                variant_name="Dog Toy",
+                summary="semantic match",
+                description="embedding hit",
+                brands="Vector",
+                site_id=77,
+            )
         ]
 
     def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         assert site_id == 77
         assert query_terms == {"env", "ball"}
         return [
-            {
-                "article_id": 2002,
-                "product_id": "vector-ball",
-                "variant_id": "vector-ball-1",
-                "product_name": "Vector Ball",
-                "variant_name": "Dog Toy",
-                "summary": "semantic match",
-                "description": "embedding hit",
-                "pet_type": "dog",
-                "brands": "Vector",
-                "site_id": 77,
-            },
-            {
-                "article_id": 2001,
-                "product_id": "env-only-product",
-                "variant_id": "env-only-product-1",
-                "product_name": "Env Only Ball",
-                "variant_name": "Dog Toy",
-                "summary": "ball for dog fetch",
-                "description": "small override dataset row",
-                "pet_type": "dog",
-                "brands": "Env Brand",
-                "site_id": 77,
-            },
+            _catalog_record(
+                article_id=2002,
+                product_id="vector-ball",
+                variant_id="vector-ball-1",
+                product_name="Vector Ball",
+                variant_name="Dog Toy",
+                summary="semantic match",
+                description="embedding hit",
+                brands="Vector",
+                site_id=77,
+            ),
+            _catalog_record(
+                article_id=2001,
+                product_id="env-only-product",
+                variant_id="env-only-product-1",
+                product_name="Env Only Ball",
+                variant_name="Dog Toy",
+                summary="ball for dog fetch",
+                description="small override dataset row",
+                brands="Env Brand",
+                site_id=77,
+            ),
         ]
 
     monkeypatch.setattr(
@@ -178,58 +199,52 @@ def test_database_product_retriever_uses_minimum_vector_similarity_threshold(
         embedding: list[float],
         *,
         limit: int,
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogVectorMatch]:
         assert site_id == 1
         assert embedding == [0.1, 0.2]
         assert limit == 3
         return [
-            {
-                "article_id": 3001,
-                "product_id": "vector-kept",
-                "variant_id": "vector-kept-1",
-                "product_name": "Vector Kept",
-                "variant_name": "Toy",
-                "summary": "semantic match",
-                "description": "kept at threshold",
-                "pet_type": "dog",
-                "brands": "Vector",
-                "site_id": 1,
-                "distance": 0.7,
-            },
-            {
-                "article_id": 3002,
-                "product_id": "vector-dropped",
-                "variant_id": "vector-dropped-1",
-                "product_name": "Vector Dropped",
-                "variant_name": "Toy",
-                "summary": "weak semantic match",
-                "description": "below threshold",
-                "pet_type": "dog",
-                "brands": "Vector",
-                "site_id": 1,
-                "distance": 0.71,
-            },
+            _vector_match(
+                distance=0.7,
+                article_id=3001,
+                product_id="vector-kept",
+                variant_id="vector-kept-1",
+                product_name="Vector Kept",
+                variant_name="Toy",
+                summary="semantic match",
+                description="kept at threshold",
+                brands="Vector",
+            ),
+            _vector_match(
+                distance=0.71,
+                article_id=3002,
+                product_id="vector-dropped",
+                variant_id="vector-dropped-1",
+                product_name="Vector Dropped",
+                variant_name="Toy",
+                summary="weak semantic match",
+                description="below threshold",
+                brands="Vector",
+            ),
         ]
 
     def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         assert site_id == 1
         assert query_terms == {"dog", "ball"}
         return [
-            {
-                "article_id": 1001,
-                "product_id": "dog-ball-1",
-                "variant_id": "dog-ball-1-a",
-                "product_name": "Dog Ball Pro",
-                "variant_name": "Fetch Toy",
-                "summary": "dog ball for fetch",
-                "description": "exact lexical match",
-                "pet_type": "dog",
-                "brands": "Alpha",
-                "site_id": 1,
-            },
+            _catalog_record(
+                article_id=1001,
+                product_id="dog-ball-1",
+                variant_id="dog-ball-1-a",
+                product_name="Dog Ball Pro",
+                variant_name="Fetch Toy",
+                summary="dog ball for fetch",
+                description="exact lexical match",
+                brands="Alpha",
+            ),
         ]
 
     monkeypatch.setattr(
@@ -264,22 +279,21 @@ def test_database_product_retriever_falls_back_to_lexical_when_embedding_fails(
     def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         assert site_id == 77
         assert query_terms == {"env", "ball"}
         return [
-            {
-                "article_id": 2001,
-                "product_id": "env-only-product",
-                "variant_id": "env-only-product-1",
-                "product_name": "Env Only Ball",
-                "variant_name": "Dog Toy",
-                "summary": "ball for dog fetch",
-                "description": "small override dataset row",
-                "pet_type": "dog",
-                "brands": "Env Brand",
-                "site_id": 77,
-            }
+            _catalog_record(
+                article_id=2001,
+                product_id="env-only-product",
+                variant_id="env-only-product-1",
+                product_name="Env Only Ball",
+                variant_name="Dog Toy",
+                summary="ball for dog fetch",
+                description="small override dataset row",
+                brands="Env Brand",
+                site_id=77,
+            )
         ]
 
     monkeypatch.setattr(
@@ -313,83 +327,73 @@ def test_database_product_retriever_ignores_zero_similarity_vector_saturation(
         embedding: list[float],
         *,
         limit: int,
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogVectorMatch]:
         assert site_id == 1
         assert embedding == [0.1, 0.2]
         assert limit == 3
         return [
-            {
-                "article_id": 9001,
-                "product_id": "noise-1",
-                "variant_id": "noise-1-a",
-                "product_name": "Noise One",
-                "variant_name": "Toy",
-                "summary": "irrelevant row",
-                "description": "semantic miss",
-                "pet_type": "dog",
-                "brands": "Noise",
-                "site_id": 1,
-                "distance": 1.0,
-            },
-            {
-                "article_id": 9002,
-                "product_id": "noise-2",
-                "variant_id": "noise-2-a",
-                "product_name": "Noise Two",
-                "variant_name": "Toy",
-                "summary": "irrelevant row",
-                "description": "semantic miss",
-                "pet_type": "dog",
-                "brands": "Noise",
-                "site_id": 1,
-                "distance": 1.1,
-            },
-            {
-                "article_id": 9003,
-                "product_id": "noise-3",
-                "variant_id": "noise-3-a",
-                "product_name": "Noise Three",
-                "variant_name": "Toy",
-                "summary": "irrelevant row",
-                "description": "semantic miss",
-                "pet_type": "dog",
-                "brands": "Noise",
-                "site_id": 1,
-                "distance": 1.4,
-            },
+            _vector_match(
+                distance=1.0,
+                article_id=9001,
+                product_id="noise-1",
+                variant_id="noise-1-a",
+                product_name="Noise One",
+                variant_name="Toy",
+                summary="irrelevant row",
+                description="semantic miss",
+                brands="Noise",
+            ),
+            _vector_match(
+                distance=1.1,
+                article_id=9002,
+                product_id="noise-2",
+                variant_id="noise-2-a",
+                product_name="Noise Two",
+                variant_name="Toy",
+                summary="irrelevant row",
+                description="semantic miss",
+                brands="Noise",
+            ),
+            _vector_match(
+                distance=1.4,
+                article_id=9003,
+                product_id="noise-3",
+                variant_id="noise-3-a",
+                product_name="Noise Three",
+                variant_name="Toy",
+                summary="irrelevant row",
+                description="semantic miss",
+                brands="Noise",
+            ),
         ]
 
     def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         assert site_id == 1
         assert query_terms == {"dog", "ball"}
         return [
-            {
-                "article_id": 1001,
-                "product_id": "dog-ball-1",
-                "variant_id": "dog-ball-1-a",
-                "product_name": "Dog Ball Pro",
-                "variant_name": "Fetch Toy",
-                "summary": "dog ball for fetch",
-                "description": "exact lexical match",
-                "pet_type": "dog",
-                "brands": "Alpha",
-                "site_id": 1,
-            },
-            {
-                "article_id": 1002,
-                "product_id": "dog-ball-2",
-                "variant_id": "dog-ball-2-a",
-                "product_name": "Dog Ball Mini",
-                "variant_name": "Toy",
-                "summary": "dog ball toy",
-                "description": "second lexical match",
-                "pet_type": "dog",
-                "brands": "Beta",
-                "site_id": 1,
-            },
+            _catalog_record(
+                article_id=1001,
+                product_id="dog-ball-1",
+                variant_id="dog-ball-1-a",
+                product_name="Dog Ball Pro",
+                variant_name="Fetch Toy",
+                summary="dog ball for fetch",
+                description="exact lexical match",
+                brands="Alpha",
+            ),
+            _catalog_record(
+                article_id=1002,
+                product_id="dog-ball-2",
+                variant_id="dog-ball-2-a",
+                product_name="Dog Ball Mini",
+                variant_name="Toy",
+                summary="dog ball toy",
+                description="second lexical match",
+                brands="Beta",
+            ),
         ]
 
     monkeypatch.setattr(
@@ -415,7 +419,7 @@ def test_database_product_retriever_wraps_database_failures(monkeypatch) -> None
     def _load_rows_for_site(
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         assert site_id == 1
         assert query_terms == {"dog", "food"}
         raise OSError("database offline")

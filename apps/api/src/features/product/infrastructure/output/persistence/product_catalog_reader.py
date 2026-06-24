@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from sqlalchemy import create_engine, or_, select
 
 from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
     PRODUCT_SEARCHABLE_FIELDS,
+    ProductCatalogRecord,
     product_catalog_entries,
+    to_product_catalog_record,
 )
 
 
@@ -13,6 +17,12 @@ MAX_SQL_PREFILTER_TERMS = 6
 VECTOR_CANDIDATE_ROW_LIMIT = 6
 MINIMUM_VECTOR_SIMILARITY = 0.3
 MAXIMUM_VECTOR_DISTANCE = 1.0 - MINIMUM_VECTOR_SIMILARITY
+
+
+@dataclass(frozen=True)
+class ProductCatalogVectorMatch:
+    record: ProductCatalogRecord
+    distance: float
 
 
 class ProductCatalogReader:
@@ -33,14 +43,14 @@ class ProductCatalogReader:
         self,
         site_id: int,
         query_terms: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogRecord]:
         engine = create_engine(self._database_url)
         statement = self._build_candidate_statement(site_id, query_terms)
 
         try:
             with engine.connect() as connection:
                 result = connection.execute(statement)
-                return [dict(row) for row in result.mappings()]
+                return [to_product_catalog_record(row) for row in result.mappings()]
         finally:
             engine.dispose()
 
@@ -50,14 +60,20 @@ class ProductCatalogReader:
         embedding: list[float],
         *,
         limit: int,
-    ) -> list[dict[str, object]]:
+    ) -> list[ProductCatalogVectorMatch]:
         engine = create_engine(self._database_url)
         statement = self._build_vector_statement(site_id, embedding, limit=limit)
 
         try:
             with engine.connect() as connection:
                 result = connection.execute(statement)
-                return [dict(row) for row in result.mappings()]
+                return [
+                    ProductCatalogVectorMatch(
+                        record=to_product_catalog_record(row),
+                        distance=float(row["distance"]),
+                    )
+                    for row in result.mappings()
+                ]
         finally:
             engine.dispose()
 

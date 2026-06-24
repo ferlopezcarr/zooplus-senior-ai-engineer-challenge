@@ -12,12 +12,8 @@ from src.features.chat.infrastructure.output.http.errors import (
 )
 from src.features.product.infrastructure.output.persistence.product_catalog_reader import (
     MINIMUM_VECTOR_SIMILARITY,
-    ProductCatalogReader,
-)
-from src.features.product.infrastructure.output.persistence.product_catalog_repository import (
     ProductCatalogRecord,
-    build_product_search_text,
-    to_product_catalog_record,
+    ProductCatalogReader,
 )
 
 
@@ -67,8 +63,7 @@ class ProductDatabaseRetriever:
             rows, query_terms=query_terms, limit=limit
         )
         lexical_products = [
-            _to_chat_product(to_product_catalog_record(row), float(score))
-            for score, row in ranked_rows
+            _to_chat_product(record, float(score)) for score, record in ranked_rows
         ]
         if not vector_products:
             return lexical_products
@@ -101,13 +96,11 @@ class ProductDatabaseRetriever:
             return []
 
         vector_products: list[Product] = []
-        for row in rows:
-            similarity = _vector_similarity_from_distance(float(row["distance"]))
+        for match in rows:
+            similarity = _vector_similarity_from_distance(match.distance)
             if similarity < MINIMUM_VECTOR_SIMILARITY:
                 continue
-            vector_products.append(
-                _to_chat_product(to_product_catalog_record(row), similarity)
-            )
+            vector_products.append(_to_chat_product(match.record, similarity))
         return vector_products
 
 
@@ -116,16 +109,16 @@ def split_query_terms(query: str) -> set[str]:
 
 
 def rank_rows_by_query_terms(
-    rows: list[dict[str, object]],
+    rows: list[ProductCatalogRecord],
     *,
     query_terms: set[str],
     limit: int,
-) -> list[tuple[int, dict[str, object]]]:
+) -> list[tuple[int, ProductCatalogRecord]]:
     if not query_terms:
         return []
 
     minimum_score = _minimum_match_score_for_query_terms(query_terms)
-    scored_matches: list[tuple[int, dict[str, object]]] = []
+    scored_matches: list[tuple[int, ProductCatalogRecord]] = []
     for row in rows:
         searchable_terms = _build_searchable_terms(row)
         score = _calculate_match_score(query_terms, searchable_terms)
@@ -143,25 +136,16 @@ def _minimum_match_score_for_query_terms(query_terms: set[str]) -> int:
     return MULTI_TERM_MINIMUM_MATCH_SCORE
 
 
-def _build_searchable_terms(row: dict[str, object]) -> set[str]:
-    return set(build_product_search_text(row).split())
+def _build_searchable_terms(row: ProductCatalogRecord) -> set[str]:
+    return set(row.search_text.split())
 
 
 def _calculate_match_score(query_terms: set[str], searchable_terms: set[str]) -> int:
     return sum(1 for term in query_terms if term in searchable_terms)
 
 
-def _row_title(row: dict[str, object]) -> str:
-    return normalize_text(
-        " ".join(
-            part
-            for part in (
-                str(row.get("product_name", "")),
-                str(row.get("variant_name", "")),
-            )
-            if part
-        )
-    )
+def _row_title(row: ProductCatalogRecord) -> str:
+    return normalize_text(row.title)
 
 
 def _vector_similarity_from_distance(distance: float) -> float:
@@ -178,5 +162,5 @@ def _to_chat_product(record: ProductCatalogRecord, score: float) -> Product:
         site_id=record.site_id,
         category=normalize_text(record.pet_type),
         score=score,
-        search_text=build_product_search_text(record),
+        search_text=record.search_text,
     )
