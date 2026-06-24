@@ -9,7 +9,7 @@ Local execution guide for the current `apps/api` service.
 - `docs/specs/dataset-grounded-retrieval.md` for the current retrieval boundary.
 - `../../infrastructure/local/README.md` for local PostgreSQL/pgvector startup.
 - `scripts/README.md` for the static product catalog feed.
-- `requests/*.http` for minimal local request examples.
+- `requests/**/*.http` for minimal local request examples.
 
 ## Local startup
 
