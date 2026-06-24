@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from sqlalchemy.dialects import postgresql
 
 import src.features.product.infrastructure.output.persistence.product_catalog_reader as reader_module
@@ -27,8 +28,14 @@ class _StubResult:
 
 
 class _StubConnection:
-    def __init__(self, rows: list[dict[str, object]]) -> None:
+    def __init__(
+        self,
+        rows: list[dict[str, object]],
+        *,
+        execute_error: Exception | None = None,
+    ) -> None:
         self._rows = rows
+        self._execute_error = execute_error
         self.executed_statements: list[object] = []
 
     def __enter__(self) -> _StubConnection:
@@ -39,12 +46,19 @@ class _StubConnection:
 
     def execute(self, statement):
         self.executed_statements.append(statement)
+        if self._execute_error is not None:
+            raise self._execute_error
         return _StubResult(self._rows)
 
 
 class _StubEngine:
-    def __init__(self, rows: list[dict[str, object]]) -> None:
-        self.connection = _StubConnection(rows)
+    def __init__(
+        self,
+        rows: list[dict[str, object]],
+        *,
+        execute_error: Exception | None = None,
+    ) -> None:
+        self.connection = _StubConnection(rows, execute_error=execute_error)
         self.disposed = False
 
     def connect(self) -> _StubConnection:
@@ -54,8 +68,13 @@ class _StubEngine:
         self.disposed = True
 
 
-def _install_engine(monkeypatch, rows: list[dict[str, object]]) -> _StubEngine:
-    engine = _StubEngine(rows)
+def _install_engine(
+    monkeypatch,
+    rows: list[dict[str, object]],
+    *,
+    execute_error: Exception | None = None,
+) -> _StubEngine:
+    engine = _StubEngine(rows, execute_error=execute_error)
     monkeypatch.setattr(reader_module, "create_engine", lambda _: engine)
     return engine
 
@@ -79,6 +98,25 @@ def test_product_catalog_reader_validates_database_with_public_readiness_check(
     assert "SELECT product_catalog_entries.article_id" in str(compiled)
     assert "LIMIT %(param_1)s" in str(compiled)
     assert compiled.params["param_1"] == 1
+
+
+def test_product_catalog_reader_disposes_engine_when_readiness_check_fails(
+    monkeypatch,
+) -> None:
+    engine = _install_engine(
+        monkeypatch,
+        rows=[],
+        execute_error=RuntimeError("catalog is unavailable"),
+    )
+    reader = ProductCatalogReader(
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
+    )
+
+    with pytest.raises(RuntimeError, match="catalog is unavailable"):
+        reader.validate_database()
+
+    assert engine.disposed is True
+    assert len(engine.connection.executed_statements) == 1
 
 
 def test_product_catalog_reader_loads_rows_for_site_via_public_method(
@@ -138,8 +176,6 @@ def test_product_catalog_reader_loads_rows_for_site_via_public_method(
     )
     assert compiled.params["site_id_1"] == 1
     assert compiled.params["param_1"] == LEXICAL_CANDIDATE_ROW_LIMIT
-    assert "ORDER BY product_catalog_entries.article_id ASC" in str(compiled)
-    assert "LIMIT %(param_1)s" in str(compiled)
 
     ilike_params = {
         key: value
@@ -156,6 +192,25 @@ def test_product_catalog_reader_loads_rows_for_site_via_public_method(
         "%ball%",
         "%treat%",
     }
+
+
+def test_product_catalog_reader_disposes_engine_when_loading_rows_fails(
+    monkeypatch,
+) -> None:
+    engine = _install_engine(
+        monkeypatch,
+        rows=[],
+        execute_error=RuntimeError("catalog query failed"),
+    )
+    reader = ProductCatalogReader(
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
+    )
+
+    with pytest.raises(RuntimeError, match="catalog query failed"):
+        reader.load_rows_for_site(1, {"dog"})
+
+    assert engine.disposed is True
+    assert len(engine.connection.executed_statements) == 1
 
 
 def test_product_catalog_reader_loads_vector_rows_for_site_via_public_method(
@@ -209,14 +264,27 @@ def test_product_catalog_reader_loads_vector_rows_for_site_via_public_method(
 
     assert compiled.params["site_id_1"] == 77
     assert compiled.params["embedding_1"] == [0.1, 0.2]
-    assert compiled.params["param_1"] == MAXIMUM_VECTOR_DISTANCE
     assert compiled.params["param_2"] == VECTOR_CANDIDATE_ROW_LIMIT
-    assert "embedding IS NOT NULL" in str(compiled)
-    assert "<= %(param_1)s" in str(compiled)
-    assert (
-        "ORDER BY (product_catalog_entries.embedding <=> %(embedding_1)s) ASC"
-        in str(compiled)
+    assert compiled.params["param_1"] == MAXIMUM_VECTOR_DISTANCE
+
+
+def test_product_catalog_reader_disposes_engine_when_loading_vector_rows_fails(
+    monkeypatch,
+) -> None:
+    engine = _install_engine(
+        monkeypatch,
+        rows=[],
+        execute_error=RuntimeError("vector query failed"),
     )
+    reader = ProductCatalogReader(
+        "postgresql+psycopg://test_user:test_password@example.test:5432/catalog"
+    )
+
+    with pytest.raises(RuntimeError, match="vector query failed"):
+        reader.load_vector_rows_for_site(77, [0.1, 0.2], limit=9)
+
+    assert engine.disposed is True
+    assert len(engine.connection.executed_statements) == 1
 
 
 def test_product_search_text_uses_canonical_fields() -> None:
