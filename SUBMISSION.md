@@ -126,6 +126,8 @@ Regression checks:
 
 **Trade-off:** Local setup is heavier because migrations and feed loading are manual prerequisites.
 
+**Additional PoC scope note:** The current manual ingestion/backfill path is intentionally script-based (`alembic`, `scripts/product_catalog_feed.py`, and `scripts/product_catalog_embedding_backfill.py`) and does not have the same level of automated coverage as the request-facing application flow. That is a conscious scope/budget choice for this PoC: it keeps the delivered system smaller and easier to review. A more robust long-term shape would be a dedicated ingestion/recalculation service with stronger operational and test guarantees, but building that service was intentionally left out of the current submission scope.
+
 ### 3. pgvector first, lexical fallback always available
 
 **Decision:** Retrieval uses pgvector opportunistically and lexical matching as top-up/fallback.
@@ -149,6 +151,8 @@ Regression checks:
 **Why:** It keeps the core assignment behavior available by default and avoids turning third-party model access into a blocker for local execution.
 
 **Trade-off:** Deterministic responses are less expressive than provider-backed answers, but they are safer and more reproducible for a local coding-task submission.
+
+**Additional PoC scope note:** LLM-provider HTTP failures already get an initial sanitization and truncation pass before they are logged. That pass reduces obvious leakage risk, but it is not an exhaustive sanitizer for arbitrary third-party payloads. Other provider-facing paths avoid surfacing provider bodies by collapsing failures to generic API errors. More exhaustive provider-error normalization would be a sensible follow-up outside the current PoC scope.
 
 ## Future Roadmap
 
