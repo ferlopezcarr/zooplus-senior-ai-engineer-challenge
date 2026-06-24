@@ -13,7 +13,6 @@ from src.features.product.infrastructure.input.http.model.product_embedding_resp
 )
 from src.features.product.infrastructure.output.http.errors import (
     EmbeddingConfigurationError,
-    EmbeddingProviderHttpError,
     ProductEmbeddingEntryNotFoundError,
     ProductEmbeddingStoreError,
 )
@@ -54,9 +53,10 @@ def build_product_embedding_router(
     ) -> ProductEmbeddingResponse:
         try:
             result = use_case.handle(article_id, force=force)
-        except ProductEmbeddingNotFoundError:
-            raise HTTPException(status_code=404, detail="Product not found.") from None
-        except ProductEmbeddingEntryNotFoundError:
+        except (
+            ProductEmbeddingNotFoundError,
+            ProductEmbeddingEntryNotFoundError,
+        ):
             raise HTTPException(status_code=404, detail="Product not found.") from None
         except ProductEmbeddingStoreError as exc:
             raise HTTPException(
@@ -67,11 +67,6 @@ def build_product_embedding_router(
             raise HTTPException(
                 status_code=503,
                 detail="Embedding generation is unavailable.",
-            ) from exc
-        except EmbeddingProviderHttpError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail="Embedding provider request failed.",
             ) from exc
         except Exception as exc:
             raise HTTPException(
