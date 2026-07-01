@@ -27,7 +27,7 @@ lint = [
 test = [
     # Starlette's TestClient in the current FastAPI lockset resolves to httpx2 first
     # and falls back to deprecated httpx compatibility only when httpx2 is absent.
-    "httpx2>=2.4,<3",
+    "httpx2>=2.5.0,<3",
     "pytest>=9.0.3,<10",
 ]
 
